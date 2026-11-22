@@ -14,9 +14,19 @@ __pycache__/
 .coverage
 htmlcov/
 
+# Local demo execution outputs
+faculty_demo_report.html
+faculty_demo_results.json
+
 # Temporary and local test logs
 *.log
+*.bak
 scratch/
+test_sample_evidence.txt
+
+# Uploaded evidence vault (keep folder via .gitkeep, ignore runtime test files)
+backend/uploads/*
+!backend/uploads/.gitkeep
 
 # IDE & Editor metadata
 .vscode/
