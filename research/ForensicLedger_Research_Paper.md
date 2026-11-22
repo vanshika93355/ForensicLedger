@@ -1,364 +1,231 @@
 # ForensicLedger: A Cryptographically Verified Off-Chain Chain of Custody Management Framework for Digital Evidence
 
-**Authors:** Senior Software Engineer, Cybersecurity Researcher, and Academic Research Team  
-**Institution:** Digital Forensics and Cyber Security Research Group  
-**Target Publication Venue:** *IEEE Transactions on Information Forensics and Security* / *Forensic Science International: Digital Investigation*  
-**Date:** November 2026  
-**Status:** Complete Empirical Research Paper & System Evaluation Draft  
+**[AUTHOR NAME 1]**, **[AUTHOR NAME 2]**, and **[AUTHOR NAME 3]**  
+*Digital Forensics and Cyber Security Research Group, [INSTITUTION], [CITY, COUNTRY]*  
+Email: [email@institution.edu]  
+*IEEE Transactions / IEEE Access, November 2026 (Preprint)*
 
 ---
 
-## Abstract
+### Abstract
+Admissibility of digital evidence requires verifiable integrity, authentic provenance, and an unbroken chain of custody (CoC). Paper records and centralized relational databases are exposed to privileged-insider modification and non-repudiation failures, while public permissionless blockchains introduce fee volatility, slow finality, and confidentiality concerns. This paper presents ForensicLedger, a lightweight chain of custody framework intended for single-laboratory deployment. It combines chunked off-chain evidence storage, a local sequential hash-linked event ledger, a binary Merkle tree accumulator for $O(\log N)$ inclusion proofs, and token-based role-based access control (RBAC). On a synthetic benchmark whose file sizes are modeled on the Govdocs1 corpus, the prototype reaches a steady-state SHA-256 streaming throughput of about 912 MB/s for files of 10 MB and larger, registers 100 items at a mean of 18.80 ms per item (53.19 items/s), and verifies a single item in a mean of 9.96 ms. A 1,000-leaf Merkle tree builds in 2.55 ms, and an inclusion proof verifies in 0.042 ms. In an in-memory comparison against a linear traversal baseline, Merkle verification was $81.10\times$ faster at $N = 1,000$, although it was slower at $N = 10$ and the advantage was not monotonic at larger $N$. A small tampering experiment (20 items, 10 single-byte mutations) detected all modifications. We also discuss the threat model and the limitations of a single-host trust boundary.
 
-In contemporary digital jurisprudence, ensuring the admissibility, integrity, and provenance of digital evidence is critical. The traditional custodial chain of custody (CoC) frequently relies on paper logs or centralized database entries that are susceptible to unilateral modification, administrator tampering, or repudiation. While public permissionless blockchains have been proposed to record forensic transactions, they introduce significant latency, prohibitive transaction costs (gas fees), off-chain storage synchronization risks, and confidentiality violations under data privacy regulations (e.g., GDPR, HIPAA). 
-
-This paper presents **ForensicLedger**, a lightweight, cryptographically verified forensic chain-of-custody framework designed for operational admissibility in legal environments. ForensicLedger implements a hybrid architecture combining:
-1. Deterministic **off-chain evidence storage** with SHA-256 digital fingerprinting;
-2. A **private, hash-linked cryptographic event ledger** preserving tamper-evident sequence history;
-3. **Binary Merkle tree inclusion proofs** enabling efficient sub-linear ($O(\log N)$) evidence batch verification;
-4. **Role-Based Access Control (RBAC)** enforcing separation of duties among Investigators, Forensic Analysts, and Evidence Supervisors; and
-5. Automated generation of **verifiable, audit-ready chain-of-custody court reports**.
-
-We evaluate the system against standard digital forensic corpus characteristics (evaluating Digital Corpora Govdocs1, NIST CFReDS, and DFRWS benchmarks). Empirical evaluation on real forensic workloads confirms that SHA-256 hashing sustains a throughput exceeding **850 MB/s** for large files, evidence registration achieves a sustained throughput of **~48 items per second** (mean registration latency of 20.69 ms per item), and single-file integrity verification executes in **13.38 ms**. The Merkle tree accumulator constructs a 1,000-leaf tree in **2.44 ms** and validates inclusion proofs in **0.028 ms**, yielding up to a **71.0× speedup** over linear blockchain traversal baselines while maintaining **100% empirical tampering detection accuracy** ($F_1 = 1.000$).
-
-**Keywords:** Digital Forensics, Chain of Custody, Cryptographic Hashing, Merkle Tree, Private Blockchain, Tamper-Evidence, Role-Based Access Control, Govdocs1.
+**Index Terms**—Access control, blockchains, cryptography, data integrity, digital forensics, Merkle tree.
 
 ---
 
-## 1. Introduction and Problem Statement
+## I. INTRODUCTION
 
-Digital evidence has become central to criminal, civil, and corporate investigations. According to legal frameworks such as the **United States Federal Rules of Evidence (FRE 901 and FRE 902)** and international standards such as **ISO/IEC 27037:2012** (*Guidelines for identification, collection, acquisition, and preservation of digital evidence*), digital materials are only admissible in court if the proponent establishes a verifiable chain of custody showing that:
-1. The evidence was acquired through an authorized, documented procedure;
-2. The evidence remained pristine and untampered throughout handling, transit, and lab analysis;
-3. Every custody transfer between personnel is attributable and auditable;
-4. The system can definitively detect any bit-level modification or unauthorized alteration.
+DIGITAL evidence is central to criminal prosecutions, civil litigation, and corporate investigations. Under evidentiary rules such as the U.S. Federal Rules of Evidence (FRE 901/902) and guidelines such as ISO/IEC 27037:2012, admissibility depends on showing that evidence was lawfully acquired, preserved without undetected modification, and handled under a documented, tamper-evident chain of custody.
 
-### 1.1 The Chain of Custody Fragility Problem
-Conventional forensic record-keeping predominantly relies on paper documentation or centralized relational database management systems (RDBMS). Both paradigms exhibit severe operational and cryptographic shortcomings:
-- **Paper Forms:** Vulnerable to loss, forgery, post-facto alterations, and lack of temporal precision.
-- **Centralized Relational Databases:** Database administrators (DBAs) or root attackers can execute arbitrary SQL updates (`UPDATE evidence SET sha256 = ...`) or rewrite audit logs without leaving a cryptographic trace.
-- **Disconnected Hash Lists:** Simple spreadsheet-based SHA-256 logs fail to bind the evidence hash cryptographically to the timeline, the custodian's identity, or prior custodial states.
+Traditional systems rely on paper custody forms or centralized relational databases (RDBMS). Paper logs can degrade, be lost, or be forged retrospectively. In a centralized database, a privileged administrator or an adversary holding root credentials can alter evidence metadata or audit logs without producing a cryptographic alarm. Blockchain-based alternatives have been proposed [1]–[3], but public networks can impose variable transaction fees and confirmation delays, and may expose evidence identifiers to unintended parties. Permissioned designs reduce some of these concerns at the cost of multi-node infrastructure.
 
-### 1.2 Limitations of Public Blockchain Forensics
-To mitigate central point of trust vulnerabilities, prior academic literature proposed anchoring digital forensic evidence to public blockchain networks like Ethereum or Bitcoin. However, public blockchain implementations present severe architectural barriers in real forensic practice:
-- **Cost Volatility & Gas Consumption:** Recording thousands of forensic artifacts or fine-grained custody transfers on public smart contracts entails volatile and recurring cryptocurrency transaction fees.
-- **Privacy and Data Sovereignty:** Public ledgers expose transaction metadata, timestamps, and case identifiers to the public Internet, creating jurisdictional issues and violating evidentiary privilege.
-- **Throughput & Finality Bottlenecks:** Public proof-of-work (PoW) and proof-of-stake (PoS) networks exhibit block settlement latencies (seconds to minutes) that degrade high-volume acquisition pipelines (e.g., triage imaging of hundreds of storage drives).
+The objective of this work is to design, implement, and empirically evaluate a lightweight framework that combines off-chain evidence storage, hash-linked ledger chaining, and Merkle tree accumulation to provide tamper-evident integrity and efficient selective verification on local infrastructure.
 
-### 1.3 Contributions of this Work
-ForensicLedger solves these challenges through a lightweight, verifiable, private architecture. The specific system-level contributions are:
-1. **Hybrid Off-Chain / On-Ledger Architecture:** Evidence payloads remain securely partitioned in local encrypted forensic storage, while immutable, hash-linked cryptographic blocks record every event (registration, transfer, verification, analysis).
-2. **Sub-linear Merkle Batch Verification:** Implementation of a binary Merkle tree accumulator that permits investigators and court officials to prove the inclusion and integrity of any evidence item in $O(\log N)$ steps without exposing unrelated case evidence.
-3. **Fine-Grained Role Accountability:** Cryptographic JWT-based RBAC strictly partitions responsibilities among Investigators (registration, preliminary verification), Analysts (laboratory analysis, examination), and Supervisors (oversight, audits, administrative transfer approvals).
-4. **Empirical Benchmarking on Standard Forensic Corpus Distributions:** Comprehensive benchmarking across file sizes from 1 KB to 100 MB, measuring SHA-256 generation latency, database anchoring throughput, Merkle verification speedup against linear scans, and tampering detection accuracy.
+The contributions are:
+- **Dual-layer architecture**: bulk evidence payloads are stored in an isolated local vault, while every custody event is anchored in a sequential hash-linked ledger.
+- **Merkle-based selective verification**: a binary Merkle accumulator provides $O(\log N)$ inclusion proofs that allow an examiner to verify one item without access to unrelated evidence hashes.
+- **Role accountability**: least-privilege RBAC enforced through HMAC-SHA256 signed JSON Web Tokens (JWT) for Investigator, Analyst, and Supervisor roles.
+- **Empirical evaluation**: six reproducible experiments covering streaming hashing, registration, verification, Merkle scaling, tamper detection, and a comparison with a linear-scan baseline, together with an explicit discussion of threats and limitations.
 
 ---
 
-## 2. Literature Review and Related Work
+## II. RELATED WORK
 
-| Category | Key Papers | Primary Mechanisms | Identified Limitations |
+Kumar et al. [1] proposed a distributed CoC framework on a permissioned blockchain, showing that consensus can replace a trusted database administrator; the approach requires a multi-node deployment that may be heavy for a single laboratory. Badr et al. [2] combined smart contracts with off-chain IPFS storage for medical forensics, supporting the use of off-chain storage for large payloads, though IPFS retrieval latency can limit throughput. Liang et al. [3] introduced B-CoC, which addresses privacy through channel-based encryption. Brotsis et al. [4] empirically examined blockchain platforms for IoT forensics and reported scalability and latency limitations. Al-Zahrani and Al-Dhaqm [5] proposed a cloud-oriented blockchain CoC model emphasizing role-based auditability.
+
+ForensicLedger targets the space between a single mutable database and a multi-node blockchain: it offers hash-chained tamper evidence and Merkle-based selective verification on a standalone host, with the trust trade-offs discussed in Section VI. Table I summarizes the comparison.
+
+### TABLE I: COMPARATIVE ARCHITECTURAL FEATURE MATRIX
+| Dimension | Centralized SQL | Permissioned CoC [1], [3] | ForensicLedger (this work) |
 | :--- | :--- | :--- | :--- |
-| **Traditional Digital Forensic Custody** | Carrier & Spafford (2003) [1]; NIST SP 800-86 (2006) [2]; Casey (2011) [3] | Paper custody logs, MD5/SHA-1 hashing, relational database records | No defense against privileged DBA insider tampering; lack of immutable temporal binding. |
-| **Public Blockchain Forensics** | Lone & Mir (2019) [4]; Badr et al. (2021) [5]; Al-Khateeb et al. (2019) [6] | Ethereum smart contracts, IPFS distributed storage, public transactions | High and volatile gas fees; slow transaction finality; breach of case confidentiality on public ledgers. |
-| **Private / Consortium Ledgers** | Tian et al. (2019) [7]; Al-Dhaqm et al. (2020) [8]; Meng et al. (2021) [9] | Hyperledger Fabric, Raft consensus, permissioned PKI nodes | Heavy operational overhead, multi-node infrastructure complexity, unsuitable for single-lab or precinct deployments. |
-| **Merkle Trees in Auditing & Transparency** | Crosby & Wallach (2009) [10]; Laurie (2014) [11]; Dahlberg et al. (2016) [12] | Merkle tree accumulators, Certificate Transparency, inclusion proofs | Focus on append-only server certificate logging rather than forensic custody life-cycles. |
-
-### 2.1 Cryptographic Hash Functions in Forensics
-Cryptographic hash functions have been standard in digital forensics since the formalization of digital preservation by Carrier and Spafford [1]. The NIST Computer Forensic Tool Testing (CFTT) program mandates cryptographic verification using collision-resistant hash functions. Due to discovered collision vulnerabilities in MD5 (Wang et al., 2005) and SHA-1 (Stevens et al., 2017), the **SHA-256 algorithm (FIPS PUB 180-4)** is universally recognized as the gold standard for evidence fingerprinting, offering 128-bit collision resistance and 256-bit pre-image resistance.
-
-### 2.2 Blockchain-Based Forensic Chains of Custody
-Lone and Mir [4] proposed *Forensic-Chain*, a framework utilizing Ethereum smart contracts for digital evidence custody. While providing decentralized immutability, their model incurred recurring transaction gas costs for every custody hand-off and required storing evidence hashes directly on the public chain. Similarly, Badr et al. [5] proposed combining IPFS with Ethereum for medical forensic records; however, their benchmarks identified IPFS retrieval latency and public ledger transaction delays as major scaling bottlenecks during large-scale forensic seizures.
-
-### 2.3 Merkle Trees for Scalable Evidence Accumulation
-Merkle trees [13], initially conceptualized by Ralph Merkle in 1979, allow cryptographic accumulators to verify membership in dynamic sets using logarithmic space and time. Crosby and Wallach [10] demonstrated the utility of history trees in tamper-evident logging, which later formed the backbone of Google's Certificate Transparency protocol (RFC 6962) [11]. In digital forensics, storing every evidence verification in a linear ledger produces an $O(N)$ verification bottleneck when courts or defense attorneys challenge multiple items. Integrating Merkle trees into private forensic event logs bridges this gap, allowing instant batch attestation.
+| **Tamper evidence** | Low (admin-mutable) | High (consortium consensus) | Moderate–high (hash-linked chain; single host) |
+| **Storage model** | Database BLOB | External IPFS / data lake | Isolated off-chain vault |
+| **Batch verification** | $O(N)$ table scan | Smart-contract query | $O(\log N)$ Merkle proof |
+| **Transaction fees** | None | None (high server cost) | None |
+| **Infrastructure** | Single-server DB | Multi-node cluster | Lightweight standalone |
 
 ---
 
-## 3. Research Gap and Novelty
+## III. PROPOSED METHODOLOGY
 
-### 3.1 The Research Gap
-Prior research presents a dichotomy:
-- **Excessively Simple Systems:** Standalone Python scripts or localized SQLite databases that compute SHA-256 hashes but lack cryptographic chaining, role-based access validation, and Merkle inclusion proofs.
-- **Over-Engineered Distributed Systems:** Complex multi-party Ethereum or Hyperledger installations that demand enterprise cloud infrastructure, smart contract deployment, token maintenance, and heavy consensus protocols unnecessary for a single investigating agency or law enforcement digital forensics laboratory (DFL).
+### A. System Architecture and Data Flow
+ForensicLedger has three coordinated tiers (Fig. 1): (1) a presentation and role-based access tier, (2) a cryptographic evidence and ledger engine, and (3) a Merkle accumulator subsystem. When a file arrives via multipart HTTP POST, the stream is passed through a 1 MB chunked buffer that computes its SHA-256 fingerprint while the file is written to an isolated vault directory. The digest, metadata, and custodian identity are then appended to the hash-linked ledger.
 
-### 3.2 System-Level Novelty Justification
-ForensicLedger does not claim that SHA-256, Merkle trees, or blockchains are individually new. Rather, the **research novelty resides in the system-level integration**:
-1. **Lightweight Standalone Cryptographic Guarantees:** Achieving public-blockchain-grade immutability and mathematical non-repudiation on localized, cost-effective infrastructure without network gas costs or external dependencies.
-2. **Dual-Layer Verification Model:** Decoupling physical storage integrity from transactional chain integrity. A physical file alteration immediately triggers an integrity failure during file digest checks, while any modification of prior custody entries breaks the cryptographic ledger link, allowing rapid attribution of the exact tampering vector.
-3. **Inclusion Proofs with Differential Disclosure:** Enabling investigators to extract a self-contained Merkle proof for a single evidence item to present in court without revealing or compromising the hashes of other confidential evidence items registered in the same batch or case.
+*(Fig. 1. ForensicLedger architecture: evidence payloads are stored off-chain, while digests and custody events are anchored in the ledger and summarized by a Merkle root.)*
 
----
+### B. Threat Model
+We consider the following adversaries: (i) a malicious insider or database administrator who edits evidence files or ledger records after registration; (ii) an attacker with stolen user credentials who attempts actions beyond the role’s privileges; (iii) an adversary who modifies evidence bytes in the vault; and (iv) an adversary who truncates, reorders, or rolls back ledger entries. ForensicLedger is designed to detect (iii) and in-place edits under (i) and (iv), and to restrict (ii) through role scoping. An adversary with full control of the host who can rewrite the entire ledger and recompute all hashes is outside the guarantees of the current prototype unless the latest ledger head or Merkle root is anchored externally (see Section VI).
 
-## 4. System Architecture and Methodology
+### C. Hash-Linked Ledger
+Every event produces a block $B_k$ containing an index $idx_k$, an ISO-8601 UTC timestamp $ts_k$, an evidence identifier $eid_k$, an action type $act_k \in \{\text{GENESIS}, \text{REGISTER}, \text{TRANSFER}, \text{VERIFY}, \text{ANALYZE}\}$, the actor identity $actor_k$, a JSON payload $pl_k$, and the previous block hash $prev_k$. With canonical (key-sorted) JSON serialization, the block digest is:
 
-The ForensicLedger framework consists of three cooperating layers: the **Cryptographic Storage & Evidence Engine**, the **Hash-Linked Ledger & Accumulator Engine**, and the **Role-Based Presentation & Reporting Engine**.
+$$H(B_k) = \text{SHA256}(\text{Ser}(idx_k, ts_k, eid_k, act_k, actor_k, pl_k, prev_k)) \tag{1}$$
 
-```
-+----------------------------------------------------------------------------------+
-|                            USER & CLIENT INTERFACE                              |
-|  +--------------------+  +---------------------+  +---------------------------+  |
-|  | Investigator View  |  | Forensic Analyst UI |  | Supervisor & Audit Panel  |  |
-|  +--------------------+  +---------------------+  +---------------------------+  |
-+----------------------------------------+-----------------------------------------+
-                                         | REST API (JSON / Bearer JWT)
-+----------------------------------------v-----------------------------------------+
-|                               API & AUTH GATEWAY                                 |
-|  - JWT Authentication & RBAC Middleware (PyJWT, HS256)                          |
-|  - Multi-part Stream Upload Handler (SHA-256 on ingestion)                      |
-|  - Court Report Dispatcher (PDF / Plain-Text Streams)                           |
-+-------------------+------------------------------------+-------------------------+
-                    |                                    |
-+-------------------v------------------+  +--------------v-------------------------+
-|     OFF-CHAIN EVIDENCE STORAGE       |  |     CRYPTOGRAPHIC LEDGER ENGINE        |
-|  - Isolated File Vault (backend/uploads) |  - Sequential Hash-Linked Ledger (SQLite) |
-|  - Unique Prefixed Identifiers (UUIDv4)|  - Genesis Block Anchor                   |
-|  - Streaming Chunked Digesting (1MB) |  - Block Hash: H(idx|ts|eid|act|actor|p|prev)|
-+-------------------+------------------+  +--------------+-------------------------+
-                    |                                    |
-                    +------------------+-----------------+
-                                       |
-+--------------------------------------v-------------------------------------------+
-|                          MERKLE ACCUMULATOR MODULE                               |
-|  - Binary Merkle Tree Construction: leaves = H(evidence_id : sha256)             |
-|  - Logarithmic Proof Generation: get_proof(target_leaf) -> [ {sibling, pos} ]    |
-|  - Independent Court Verification: verify_proof(target_leaf, proof, root)       |
-+----------------------------------------------------------------------------------+
+The chain is valid if:
+
+$$prev_0 = 0^{64} \quad \text{and} \quad prev_k = H(B_{k-1}) \quad \forall k > 0 \tag{2}$$
+
+#### Algorithm 1: Ledger Append and Chain Validation
+```text
+procedure APPEND(eid, act, actor, pl)
+    prev <- H(last block) or 0^64 if empty
+    B <- (idx, UTCNOW(), eid, act, actor, pl, prev)
+    B.hash <- SHA256(Ser(B)); persist B
+end procedure
+
+procedure VALIDATE(chain)
+    prev <- 0^64
+    for each block B_k in order do
+        if B_k.prev != prev or SHA256(Ser(B_k)) != B_k.hash then
+            return INVALID(k)
+        end if
+        prev <- B_k.hash
+    end for
+    return VALID
+end procedure
 ```
 
-### 4.1 Off-Chain Evidence Storage
-Directly storing raw multi-gigabyte forensic images inside a database or blockchain leads to severe performance degradation. ForensicLedger employs **off-chain evidence storage**. Upon upload:
-1. The raw evidence file is received via a streaming multipart HTTP POST endpoint.
-2. The file is sanitized and written to an isolated storage vault (`backend/uploads/`) under a unique system-generated identifier:
-   $$\text{StoredFilename} = \text{EID} \mathbin{\Vert} \text{"\_"} \mathbin{\Vert} \text{SanitizedFilename}$$
-   where $\text{EID} = \text{"EV-"} \mathbin{\Vert} \text{UUID4}_{12}$.
-3. The cryptographic fingerprint is computed via 1 MB chunked SHA-256 streaming:
-   $$H_{\text{file}} = \text{SHA-256}(\text{FileBytes})$$
-4. The database records file metadata (size, registration timestamp, original filename, current custodian, $H_{\text{file}}$).
+### D. Merkle Accumulator and Inclusion Proofs
+To support selective disclosure without revealing unrelated evidence hashes, a binary Merkle tree is built over ordered leaves:
 
-### 4.2 Hash-Linked Private Blockchain Ledger
-Every lifecycle event concerning an evidence artifact generates an immutable block appended to the private ledger. Let block $k$ be denoted as $B_k$. The block contains:
-- $\text{idx}_k \in \mathbb{N}$: Monotonically increasing block index ($\text{idx}_0 = 0$ for Genesis).
-- $\text{ts}_k \in \text{ISO-8601}$: UTC timestamp of event recording.
-- $\text{eid}_k \in \text{String}$: Associated evidence identifier (or `NULL` for system blocks).
-- $\text{act}_k \in \{\text{GENESIS}, \text{REGISTER}, \text{TRANSFER}, \text{VERIFY}, \text{ANALYZE}\}$: Action type.
-- $\text{actor}_k \in \text{String}$: User ID executing the action.
-- $\text{payload}_k \in \text{JSON}$: Canonicalized, alphabetically sorted JSON metadata.
-- $\text{prev\_hash}_k \in \{0,1\}^{256}$: Cryptographic hash of block $B_{k-1}$ (or $0^{64}$ for Genesis).
+$$L_i = \text{SHA256}(eid_i \parallel \text{':'} \parallel \text{SHA256}(file_i)) \tag{3}$$
 
-The block hash is strictly calculated over canonical JSON serialization:
-$$H(B_k) = \text{SHA-256}\left(\text{JSON}_{\text{canonical}}\left(\{\text{idx}_k, \text{ts}_k, \text{eid}_k, \text{act}_k, \text{actor}_k, \text{payload}_k, \text{prev\_hash}_k\}\right)\right)$$
+An inclusion proof for leaf $L_t$ is the list of sibling hashes along the path to the root, of length:
 
-#### Chain Validation Algorithm
-A chain of length $M$ is valid if and only if:
-$$\forall k \in [0, M-1]: \quad \text{idx}_k = k \quad \land \quad H(B_k) = \text{RecomputedHash}(B_k) \quad \land \quad \text{prev\_hash}_k = \begin{cases} 0^{64} & k=0 \\ H(B_{k-1}) & k > 0 \end{cases}$$
+$$\ell = \lceil \log_2 N \rceil \tag{4}$$
 
-### 4.3 Merkle Tree Accumulator & Inclusion Proofs
-To allow external parties (judges, defense counsel) to verify that an evidence item belongs to the officially registered evidence pool without providing them access to the entire database, ForensicLedger generates a **binary Merkle tree**:
-1. **Leaf Construction:** For all $N$ evidence items ordered deterministically by ID:
-   $$L_i = \text{SHA-256}\left(\text{EID}_i \mathbin{\Vert} \text{":"} \mathbin{\Vert} H_{\text{file}, i}\right), \quad i \in [0, N-1]$$
-2. **Tree Aggregation:** If a layer has an odd number of nodes, the terminal node is duplicated. Pairwise concatenation produces parent nodes:
-   $$\text{Parent}_{j} = \text{SHA-256}\left(\text{LeftChild} \mathbin{\Vert} \text{RightChild}\right)$$
-3. **Inclusion Proof:** For target leaf $L_t$, the proof $\mathcal{P}_t$ is an ordered sequence of tuple pairs:
-   $$\mathcal{P}_t = \left[ (S_0, \text{pos}_0), (S_1, \text{pos}_1), \dots, (S_{d-1}, \text{pos}_{d-1}) \right]$$
-   where $d = \lceil\log_2 N\rceil$, $S_m$ is the sibling hash at depth $m$, and $\text{pos}_m \in \{\text{left}, \text{right}\}$.
-4. **Verification:** Starting from $C_0 = L_t$:
-   $$C_{m+1} = \begin{cases} \text{SHA-256}(S_m \mathbin{\Vert} C_m) & \text{if } \text{pos}_m = \text{left} \\ \text{SHA-256}(C_m \mathbin{\Vert} S_m) & \text{if } \text{pos}_m = \text{right} \end{cases}$$
-   The proof is valid if and only if $C_d = \text{Root}_{\text{Merkle}}$.
+An examiner recomputes the root from $L_t$ and the proof and compares it with the published root using $O(\log N)$ hash operations.
+
+#### Algorithm 2: Merkle Inclusion Proof
+```text
+procedure PROVE(leaves, t)
+    level <- leaves; proof <- []; i <- t
+    while |level| > 1 do
+        sib <- i ^ 1  // sibling index; duplicate last node if odd
+        append (level[sib], i mod 2) to proof
+        level <- HASHPAIRS(level); i <- floor(i / 2)
+    end while
+    return proof
+end procedure
+
+procedure VERIFY(L_t, proof, root)
+    h <- L_t
+    for (s, pos) in proof do
+        h <- (pos == 0) ? SHA256(h || s) : SHA256(s || h)
+    end for
+    return h == root
+end procedure
+```
 
 ---
 
-## 5. Dataset Evaluation and Selection
+## IV. EXPERIMENTAL SETUP
 
-### 5.1 Dataset Comparative Analysis
+**Dataset statement.** The evaluation workload is *synthetic*. A generator produced files at six size tiers (1 KB, 10 KB, 100 KB, 1 MB, 10 MB, 100 MB) chosen to resemble the size distribution of the Digital Corpora Govdocs1 collection. The real Govdocs1 files were not used, and the synthetic files do not reproduce its MIME structure or entropy in any validated way.
 
-A critical requirement for digital forensics research is grounding benchmarks in realistic evidence distributions rather than arbitrary random byte streams. We evaluated three premier forensic corpora:
-
-| Dataset / Corpus | Curating Institution | Primary Composition | Typical File Sizes | Forensic Relevance | Availability & Licensing |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Govdocs1** [14] | Digital Corpora (Garfinkel et al.) | ~1,000,000 extracted government files (PDF, DOC, PPT, XLS, HTML, TXT, JPG) | 1 KB – 50 MB (Mean: ~450 KB) | **Very High**: Mirrors seized corporate and governmental document evidence. | Open Access, CC0 / Public Domain via DigitalCorpora.org. Segmented into 1,000 zip files. |
-| **CFReDS** [15] | NIST (National Institute of Standards & Technology) | Raw hard drive images, memory dumps, smartphone physical extractions | 512 MB – 64 GB per disk image | **High**: Excellent for acquisition and raw imaging; too heavy for metadata and document tracking. | Public Domain; requires massive multi-terabyte storage infrastructure. |
-| **DFRWS Challenges** [16] | DFRWS Association | Mixed scenario files, memory captures, network pcap logs | 10 MB – 8 GB per challenge | **Moderate**: Scenario-specific; lacks file-type diversity needed for statistical document benchmarks. | Freely available for non-commercial academic research. |
-
-### 5.2 Selection Justification: Govdocs1 Profile
-We selected the **Govdocs1 profile** as the most appropriate standard for Digital Chain of Custody (CoC) evaluation:
-1. **Representativeness:** Criminal and regulatory subpoenas predominantly inspect document artifacts (PDF, DOCX, XLSX, TXT, images) rather than raw forensic disk dumps.
-2. **File Size Distribution:** Govdocs1 spans a representative bimodal distribution: small text/metadata files (< 10 KB), average documents (100 KB – 5 MB), and complex multimedia attachments (> 10 MB).
-3. **Reproducibility:** Segmented directory structures allow testing discrete subsets (e.g., Thread 000 through Thread 010) while preserving open academic verification.
-
-To ensure non-fabricated and reproducible results, our benchmarks generated realistic multi-format workloads strictly matching the size profiles and extensions of Govdocs1 (`.pdf`, `.docx`, `.txt`, `.jpg`, `.png`, `.zip`), spanning 1 KB to 100 MB.
+**Host environment.** All experiments ran on an AMD x86_64 host (Family 25, Model 80, 12 logical threads) under Windows 11 Enterprise (64-bit, build 10.0.26300) with an NVMe PCIe 4.0 SSD, Python 3.13.13, Flask 3.1.3, and PyJWT 2.15.1. Timings used Python’s `time.perf_counter()`. Hashing experiments used 5 iterations per size; the verification experiment used 50 records. Unless noted, tables report means, and dispersion is given only where it was recorded (min/max in Table II, standard deviation for single-item verification). Repeated trials with confidence intervals for all experiments are planned.
 
 ---
 
-## 6. Experimental Results and Empirical Evaluation
+## V. RESULTS AND DISCUSSION
 
-All experiments were executed on an empirical testbed running Windows 11 Enterprise (64-bit), AMD/Intel x86_64 architecture, Python 3.13.13 runtime, equipped with high-speed NVMe PCIe 4.0 SSD storage. All measurements represent actual clock times recorded via high-resolution hardware counters (`time.perf_counter()`).
+### A. Experiment 1: SHA-256 Streaming Throughput
+Table II and Fig. 2 show hashing time and throughput from 1 KB to 100 MB. Throughput rises with size and plateaus near 900–912 MB/s from 1 MB upward. The 1 KB and 10 KB rows should not be read as steady-state rates: their per-call times are on the order of microseconds, where timer resolution, interpreter overhead, and warm-up dominate (note the 1 KB maximum of 0.6231 ms against a minimum of 0.0046 ms, and the non-monotonic 10 KB value). We therefore regard $\ge 1$ MB as the steady-state regime.
 
-### 6.1 Experiment 1: SHA-256 Hashing Performance
+### TABLE II: SHA-256 STREAMING HASHING PERFORMANCE (5 ITERATIONS)
+| Size | Mean (ms) | Min (ms) | Max (ms) | MB/s |
+| :--- | :--- | :--- | :--- | :--- |
+| **1 KB** | 0.1299 | 0.0046 | 0.6231 | 7.52† |
+| **10 KB** | 0.0147 | 0.0122 | 0.0220 | 663.43† |
+| **100 KB** | 0.1092 | 0.1069 | 0.1163 | 893.96 |
+| **1 MB** | 1.1099 | 1.0921 | 1.1305 | 901.02 |
+| **10 MB** | 10.9614 | 10.8839 | 11.1867 | 912.30 |
+| **100 MB** | 109.6493 | 108.1664 | 112.5165 | 912.00 |
 
-We evaluated the SHA-256 streaming ingestion engine across payload sizes from 1 KB to 100 MB with 5 iterations per payload:
+*†Timer-resolution/warm-up affected; not steady-state.*
 
-| File Size | Mean Latency (ms) | Min Latency (ms) | Max Latency (ms) | Standard Deviation (ms) | Effective Throughput (MB/s) |
-| :---: | :---: | :---: | :---: | :---: | :---: |
-| **1 KB** | 0.0156 | 0.0030 | 0.0618 | 0.0259 | 62.56 MB/s |
-| **10 KB** | 0.0149 | 0.0134 | 0.0194 | 0.0026 | 655.40 MB/s |
-| **100 KB** | 0.1322 | 0.1132 | 0.1666 | 0.0246 | 738.74 MB/s |
-| **1,024 KB (1 MB)** | 1.1683 | 1.1533 | 1.1917 | 0.0162 | 855.96 MB/s |
-| **10,240 KB (10 MB)** | 11.6244 | 11.5034 | 11.7247 | 0.0867 | 860.26 MB/s |
-| **102,400 KB (100 MB)** | 117.1923 | 115.5535 | 119.3838 | 1.4447 | 853.30 MB/s |
+*(Fig. 2. SHA-256 streaming throughput versus file size; small-size points are warm-up affected.)*
 
-**Analysis:** Throughput exhibits an initial ramp-up due to buffer allocation overhead, reaching steady-state throughput of **~855 MB/s** for payloads $\ge 1\text{ MB}$. This confirms that hashing does not form an operational bottleneck during evidence ingestion.
+### B. Experiments 2 and 3: Registration and Verification
+Table III and Fig. 3 report registration for batches of 1 to 100 items. A single cold registration took 97.56 ms, which we attribute to first-use initialization such as file-descriptor and database-connection setup (not separately profiled). For 100 items the mean per-item latency was 18.80 ms, or 53.19 items/s. Single-item verification over 50 records had a mean latency of 9.96 ms (min 8.34, max 20.74, std. dev. 2.85 ms), and all 50 verifications succeeded.
 
-### 6.2 Experiment 2: Evidence Registration Performance
+### TABLE III: EVIDENCE REGISTRATION BATCH SCALABILITY
+| Batch $N$ | Total (ms) | Per-item (ms) | Items/s |
+| :--- | :--- | :--- | :--- |
+| **1** | 97.56 | 97.56 | 10.25 |
+| **10** | 166.43 | 16.64 | 60.08 |
+| **25** | 524.23 | 20.97 | 47.69 |
+| **50** | 913.24 | 18.26 | 54.75 |
+| **100** | 1879.95 | 18.80 | 53.19 |
 
-We evaluated full end-to-end evidence registration—including multipart file stream transmission, server-side SHA-256 generation, disk writing, database insertion, and blockchain block anchoring—across batch sizes from 1 to 100 items:
+*(Fig. 3. Total registration time versus batch size. Per-item latency stabilizes near 18–21 ms for $N \ge 10$.)*
 
-| Batch Size ($N$) | Total Ingestion Time (ms) | Mean Per-Item Latency (ms) | Ingestion Rate (Items/sec) |
-| :---: | :---: | :---: | :---: |
-| **1** | 138.61 | 138.61 | 7.21 |
-| **10** | 196.65 | 19.67 | 50.85 |
-| **25** | 515.09 | 20.60 | 48.53 |
-| **50** | 1022.54 | 20.45 | 48.90 |
-| **100** | 2069.80 | 20.70 | 48.31 |
+### C. Experiments 4 and 5: Merkle Performance and Tamper Detection
+Table IV and Fig. 4 show that build time grows roughly linearly with the number of leaves (2.55 ms for 1,000 leaves), while proof generation and verification stay in the tens of microseconds (0.050 ms and 0.042 ms at $N = 1,000$).
 
-**Analysis:** The single-item registration includes cold-start disk handle initialization. For batches $N \ge 10$, per-item latency stabilizes at **~20.5 ms per item**, achieving a sustained registration velocity of **48.3 items/sec** on a single node without batching optimizations.
+### TABLE IV: MERKLE ACCUMULATOR PERFORMANCE
+| Leaves $N$ | Build (ms) | Proof gen (ms) | Proof verify (ms) | Valid |
+| :--- | :--- | :--- | :--- | :--- |
+| **10** | 0.0798 | 0.0204 | 0.0182 | True |
+| **50** | 0.1506 | 0.0155 | 0.0374 | True |
+| **100** | 0.2912 | 0.0149 | 0.0195 | True |
+| **500** | 1.3770 | 0.0271 | 0.0244 | True |
+| **1,000** | 2.5465 | 0.0501 | 0.0418 | True |
 
-### 6.3 Experiment 3: Evidence Verification Latency
+*(Fig. 4. Merkle tree build time and proof generation/verification latency versus leaf count.)*
 
-A random sample of 50 registered evidence files was verified through the `/api/evidence/verify/<eid>` endpoint, comparing the newly calculated file hash against the stored database baseline:
-- **Sample Size:** 50 items
-- **Integrity Status:** 100% verified intact (True)
-- **Mean Verification Latency:** **13.38 ms**
-- **Min Verification Latency:** 11.88 ms
-- **Max Verification Latency:** 20.03 ms
-- **Standard Deviation:** 1.21 ms
+In the tampering test, 20 items were checked, 10 of which had a single byte modified; the system produced $TP = 10, FP = 0, FN = 0, TN = 10$. This is expected for SHA-256, since a changed byte changes the digest with overwhelming probability, but the sample is small and the test covers only content modification, not ledger-level attacks.
 
-**Analysis:** Verification operates approximately 35% faster than registration because it bypasses multipart MIME decoding and blockchain block generation, performing only stream hashing and relational lookup.
+### D. Experiment 6: Merkle Proof versus Linear Scan
+This experiment compares Merkle proof verification with a linear traversal baseline that scans in-memory ledger blocks to locate and check one item. Table V and Fig. 5 give the results. At $N = 1,000$ the linear scan took 1.9192 ms and Merkle verification 0.0237 ms, a speedup of $81.10\times$ (the ratio of the rounded values shown is about $81.0\times$; the reported figure uses unrounded timings). The Merkle verification time here (0.0237 ms) differs from Table IV (0.0418 ms) because the two were measured in separate runs with different procedures and, at these sub-0.05 ms scales, are sensitive to timer resolution and system noise; they should not be compared directly.
 
-### 6.4 Experiment 4: Merkle Tree Accumulator Performance
+The results are not monotonic. At $N = 10$ the Merkle proof was *slower* than the scan ($0.51\times$), which is expected because fixed per-proof overhead outweighs the saving for tiny sets. At $N = 5,000$ the linear scan time fell to 0.1895 ms, giving only $5.96\times$. We hypothesize that caching or memory-layout effects in the in-memory baseline contributed, but we did not test this, and the drop could also reflect measurement noise or a baseline implementation detail. These single-run values should be confirmed with repeated trials and confidence intervals. Finally, verifying one Merkle proof and re-validating an entire hash chain provide different assurances: the former confirms membership of one item under a root, whereas the latter checks the integrity and order of all events.
 
-We evaluated binary Merkle tree construction, single-proof generation, and root verification across leaf volumes from 1 to 1,000 items:
+### TABLE V: VERIFICATION: MERKLE PROOF VS. LINEAR SCAN
+| Items $N$ | Linear (ms) | Merkle (ms) | Speedup |
+| :--- | :--- | :--- | :--- |
+| **10** | 0.0051 | 0.0099 | 0.51× |
+| **50** | 0.0289 | 0.0151 | 1.91× |
+| **100** | 0.1243 | 0.0166 | 7.49× |
+| **500** | 0.8253 | 0.0206 | 40.13× |
+| **1,000** | 1.9192 | 0.0237 | 81.10× |
+| **2,500** | 2.8867 | 0.0499 | 57.84× |
+| **5,000** | 0.1895 | 0.0318 | 5.96× |
 
-| Leaf Count ($N$) | Tree Build Time (ms) | Single Proof Generation (ms) | Single Proof Verification (ms) |
-| :---: | :---: | :---: | :---: |
-| **1** | 0.0099 | 0.0059 | 0.0025 |
-| **10** | 0.0564 | 0.0151 | 0.0159 |
-| **50** | 0.1338 | 0.0096 | 0.0167 |
-| **100** | 0.2561 | 0.0094 | 0.0185 |
-| **500** | 1.3307 | 0.0278 | 0.0242 |
-| **1,000** | 2.4428 | 0.0481 | 0.0281 |
-
-**Analysis:** Tree construction scales linearly ($O(N)$), requiring only **2.44 ms** for 1,000 evidence items. Proof generation and verification scale logarithmically ($O(\log N)$), requiring less than **0.03 ms** for 1,000 items, verifying the viability of instant court attestation.
-
-### 6.5 Experiment 5: Tampering Detection Accuracy
-
-To evaluate the system's sensitivity to unauthorized evidence alteration, we conducted an adversarial test:
-- 20 valid evidence items were registered to the ledger.
-- A controlled tamper script selected 10 items at random and introduced a single-byte mutation (`byte = (byte + 1) % 256`) directly into the file on disk, bypassing the application layer.
-- All 20 items were audited via the verification engine.
-
-#### Empirical Confusion Matrix
-| Actual \ Predicted | Predicted Tampered | Predicted Intact |
-| :---: | :---: | :---: |
-| **Actually Tampered** | **True Positive (TP) = 10** | **False Negative (FN) = 0** |
-| **Actually Intact** | **False Positive (FP) = 0** | **True Negative (TN) = 10** |
-
-#### Detection Metrics
-- **Accuracy:** $1.0000$ (100%)
-- **Precision:** $1.0000$ (100%)
-- **Recall (Sensitivity):** $1.0000$ (100%)
-- **Specificity:** $1.0000$ (100%)
-- **$F_1$-Score:** $1.0000$ (100%)
-
-**Cryptographic Rationale:** Because SHA-256 possesses the avalanche property—where changing a single input bit alters on average 50% of output bits—the probability of an undetected file modification (hash collision) is bounded by:
-$$P(\text{collision}) \approx \frac{1}{2^{256}} \approx 8.636 \times 10^{-78}$$
-This confirms mathematical non-repudiation and zero false negatives under bit-level evidence tampering.
-
-### 6.6 Experiment 6: Comparative Baseline (Merkle Proof vs. Linear Blockchain Scan)
-
-We compared the Merkle inclusion proof verification against the standard industry baseline (iterating sequentially through all $N$ blocks in a linear blockchain to locate and validate an evidence record):
-
-| Evidence Count ($N$) | Linear Blockchain Scan Baseline (ms) | Merkle Proof Verification (ms) | Observed Speedup Factor |
-| :---: | :---: | :---: | :---: |
-| **10** | 0.0138 ms | 0.0173 ms | 0.8× |
-| **50** | 0.0256 ms | 0.0207 ms | 1.2× |
-| **100** | 0.2261 ms | 0.0223 ms | **10.1×** |
-| **500** | 1.3127 ms | 0.0711 ms | **18.4×** |
-| **1,000** | 3.0065 ms | 0.0424 ms | **71.0×** |
-| **2,500** | 2.7149 ms | 0.0529 ms | **51.3×** |
-
-**Analysis:** For small volumes ($N \le 10$), in-memory linear iteration is comparable to proof reconstruction. However, as evidence volume scales to 1,000 items, the linear scan baseline requires walking and hashing 1,000 blocks (taking 3.00 ms), whereas the Merkle inclusion proof requires only $\lceil\log_2 1000\rceil = 10$ hash operations (taking 0.042 ms), delivering a **71.0× verification speedup**.
+*(Fig. 5. Observed speedup of Merkle proof verification over the linear scan baseline (single run per $N$).)*
 
 ---
 
-## 7. Comparative Analysis with Existing Literature
+## VI. LIMITATIONS
 
-| Evaluation Dimension | Centralized SQL (NIST SP 800-86) | Public Blockchain (Ethereum CoC) | Permissioned Fabric (Hyperledger CoC) | **ForensicLedger (This Work)** |
-| :--- | :---: | :---: | :---: | :---: |
-| **Data Immutability** | Low (DBA can rewrite history) | High | High | **High (Hash-linked block chain)** |
-| **Evidence Storage** | Database BLOB | External IPFS | Distributed Store | **Isolated Off-Chain Local Vault** |
-| **Transaction Cost** | Free | Significant ($5–$50 / action) | Zero Gas / High Node Cost | **Zero Cost (Standalone)** |
-| **Batch Verification** | $O(N)$ SQL Table Scan | High Gas Event Logs | Chaincode Query | **$O(\log N)$ Merkle Inclusion Proof** |
-| **Verification Speedup**| Baseline ($1\times$) | Variable (Network delay) | Network Dependent | **Up to 71.0× Speedup** |
-| **Confidentiality / Privacy** | Internal DB | Public Ledger (Breach Risk) | Channel-Based | **Local RBAC + Selective Disclosure** |
-| **Courtroom Report Export**| Manual | Smart Contract Log Export | Complex Dashboard | **Automated Cryptographic PDF/TXT** |
-| **Deployment Complexity**| Minimal | High (Wallets, Gas, Infura) | Very High (Orderers, Peers) | **Single-Command Windows/Linux** |
+**(1) Single-host trust:** the ledger is local, so an adversary controlling the host can rewrite the entire chain and recompute hashes; the guarantees hold only if the latest ledger head or Merkle root is anchored externally (e.g., trusted timestamping or witnessed publication).  
+**(2) No external timestamp authority:** timestamps come from the host clock.  
+**(3) Synthetic data:** results come from generated files modeled on Govdocs1 size tiers, not from real forensic corpora.  
+**(4) Small tamper test:** 20 items and one mutation type do not establish detection rates under broader attack scenarios.  
+**(5) Measurement scope:** single-host, in-memory micro-benchmarks with limited repetitions; persistent-storage and multi-user concurrent performance were not evaluated.  
+**(6) Key management:** JWT signing keys are held by the application and are not yet protected by an HSM or TPM.
 
 ---
 
-## 8. Role-Based Access Control and Security Enforcement
+## VII. CONCLUSION AND FUTURE WORK
 
-ForensicLedger implements strict principle-of-least-privilege **Role-Based Access Control (RBAC)** enforced through cryptographic JSON Web Tokens (JWT, RFC 7519) signed via HMAC-SHA256:
+ForensicLedger combines chunked off-chain SHA-256 fingerprinting, a hash-linked private event ledger, binary Merkle accumulation, and JWT-based RBAC in a standalone framework. In our synthetic single-host evaluation it hashed large files at about 912 MB/s, registered items at roughly 53 per second, and produced and verified Merkle proofs in well under 0.1 ms, while detecting all 10 injected single-byte modifications. The Merkle advantage over a linear scan was clear at moderate sizes but not at very small ones, and larger-scale behavior needs repeated measurement.
 
-1. **Investigator (`investigator`):**
-   - Authorized to register new evidence (`POST /api/evidence/register`).
-   - Authorized to request integrity verification (`POST /api/evidence/verify/<eid>`).
-   - Authorized to transfer custody to other registered personnel (`POST /api/custody/transfer`).
-   - Forbidden from altering blockchain blocks, resetting audit logs, or modifying user roles.
-2. **Forensic Analyst (`analyst`):**
-   - Authorized to inspect evidence details, download working copies, and compute local digests.
-   - Authorized to submit analytical verification checks.
-   - Forbidden from registering new evidence or modifying custodians without supervisory transfer.
-3. **Supervisor (`supervisor`):**
-   - Full administrative oversight.
-   - Authorized to review complete audit trails (`GET /api/audit`).
-   - Authorized to audit blockchain integrity (`GET /api/ledger/validate`).
-   - Authorized to view system user rosters and export certified court reports.
+Future work includes:
+1. Multi-site replication using the Raft consensus algorithm.
+2. Integration with an RFC 3161 timestamp authority and external anchoring of ledger heads.
+3. HSM/TPM 2.0 key protection.
+4. Evaluation on real forensic corpora with repeated trials and confidence intervals.
+
+*Source code: [repository URL].*
 
 ---
 
-## 9. Limitations and Future Scope
+## REFERENCES
 
-While ForensicLedger provides a secure, lightweight, and demonstrably performant solution, several technical limitations represent avenues for future research:
-1. **Single-Node Physical Vulnerability:** In the current standalone SQLite architecture, an attacker with operating-system-level physical root access could delete the entire database file or roll back to an earlier virtual machine snapshot. Future work will integrate **decentralized state replication using the Raft consensus algorithm** across a multi-precinct consortium.
-2. **Timestamping Authority (TSA):** The current implementation relies on the local server's host clock. Integrating an external **RFC 3161-compliant Trusted Timestamping Authority** or Bitcoin OpenTimestamps calendar anchoring would eliminate reliance on local server time.
-3. **Hardware Security Module (HSM):** Securing the JWT server signing keys and block hash generation within a FIPS 140-2 Level 3 Hardware Security Module (or TPM 2.0) would prevent key extraction under direct physical compromise.
-
----
-
-## 10. Conclusion
-
-Digital evidence chain of custody demands cryptographic immutability without sacrificing operational speed, case confidentiality, or economic feasibility. This paper introduced **ForensicLedger**, an upgraded, fully functional, and academically rigorous forensic framework. By integrating chunked off-chain SHA-256 fingerprinting, private sequential block linking, binary Merkle inclusion proofs, and cryptographic role enforcement, ForensicLedger resolves the trade-off between untrustworthy centralized databases and cost-prohibitive public blockchains.
-
-Empirical evaluations confirmed sustained SHA-256 ingestion speeds of **855 MB/s**, evidence registration latencies of **20.7 ms**, verification latencies of **13.4 ms**, Merkle verification speedups of **up to 71.0×**, and **100% precision and recall** under file tampering attacks. The framework provides an audit-ready, testable foundation for real-world digital forensics laboratory workflows and courtroom admissibility.
-
----
-
-## 11. References with Verified DOIs and Authoritative Sources
-
-1. **Carrier, B., & Spafford, E. H.** (2003). *Getting physical with the digital investigation process*. International Journal of Digital Evidence, 2(2), 1–20. [DOI: 10.1.1.13.7912](https://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.13.7912)
-2. **Kent, K., Chevalier, S., Grance, T., & Dang, H.** (2006). *Guide to Integrating Forensic Techniques into Incident Response*. National Institute of Standards and Technology (NIST) Special Publication 800-86. [DOI: 10.6028/NIST.SP.800-86](https://doi.org/10.6028/NIST.SP.800-86)
-3. **Casey, E.** (2011). *Digital Evidence and Computer Crime: Forensic Science, Computers, and the Internet* (3rd ed.). Academic Press / Elsevier. ISBN: 978-0-12-374268-1.
-4. **Lone, A. H., & Mir, R. N.** (2019). *Forensic-chain: Blockchain based digital forensics chain of custody with PoC in Ethereum*. Sādhanā (Indian Academy of Sciences), 44(8), 189. [DOI: 10.1007/s12046-019-1175-6](https://doi.org/10.1007/s12046-019-1175-6)
-5. **Badr, S., Gomaa, I., & Abd-Elhafiez, W. M.** (2021). *A secure medical forensic chain of custody based on blockchain technology*. Journal of King Saud University - Computer and Information Sciences, 34(10), 9184–9195. [DOI: 10.1016/j.jksuci.2021.10.016](https://doi.org/10.1016/j.jksuci.2021.10.016)
-6. **Al-Khateeb, B., Ahmed, M., & Mahmood, M.** (2019). *A blockchain-based model for preserving digital evidence chain of custody*. International Journal of Advanced Computer Science and Applications (IJACSA), 10(9), 421–428. [DOI: 10.14569/IJACSA.2019.0100956](https://doi.org/10.14569/IJACSA.2019.0100956)
-7. **Tian, Z., Li, M., Qiu, M., Sun, Y., & Su, S.** (2019). *Block-Def: A secure digital evidence framework using consortium blockchain*. Information Sciences, 491, 255–265. [DOI: 10.1016/j.ins.2019.04.011](https://doi.org/10.1016/j.ins.2019.04.011)
-8. **Al-Dhaqm, A., Razak, S., Othman, S. H., Nagappan, S., & Ali, A.** (2020). *A generic digital forensic investigation framework for internet of things (IoT)*. IEEE Access, 8, 144188–144203. [DOI: 10.1109/ACCESS.2020.3014319](https://doi.org/10.1109/ACCESS.2020.3014319)
-9. **Meng, W., Tischhauser, E. W., Wang, Q., Wang, Y., & Han, J.** (2021). *When intrusion detection meets blockchain technology: A review*. IEEE Access, 6, 10179–10188. [DOI: 10.1109/ACCESS.2018.2799854](https://doi.org/10.1109/ACCESS.2018.2799854)
-10. **Crosby, S. A., & Wallach, D. S.** (2009). *Efficient data structures for tamper-evident logging*. Proceedings of the 18th USENIX Security Symposium, 317–334. [USENIX Link](https://www.usenix.org/legacy/event/sec09/tech/full_papers/crosby.pdf)
-11. **Laurie, B.** (2014). *Certificate Transparency*. ACM Queue, 12(8), 10–19. [DOI: 10.1145/2668152.2668154](https://doi.org/10.1145/2668152.2668154)
-12. **Dahlberg, R., Pulls, T., & Peeters, R.** (2016). *Efficient sparse Merkle trees for Certificate Transparency*. IEEE Trustcom/BigDataSE/ISPA, 2016, 199–206. [DOI: 10.1109/TrustCom.2016.0064](https://doi.org/10.1109/TrustCom.2016.0064)
-13. **Merkle, R. C.** (1987). *A digital signature based on a conventional encryption function*. In Advances in Cryptology — CRYPTO ’87 (pp. 369–378). Springer, Berlin, Heidelberg. [DOI: 10.1007/3-540-48184-2_32](https://doi.org/10.1007/3-540-48184-2_32)
-14. **Garfinkel, S., Farrell, P., Roussev, V., & Dinolt, G.** (2009). *Bringing science to digital forensics with standardized forensic corpora*. Digital Investigation, 6, S2–S11. [DOI: 10.1016/j.diin.2009.06.016](https://doi.org/10.1016/j.diin.2009.06.016)
-15. **NIST Computer Forensic Reference Data Sets (CFReDS)** (2024). *Digital Evidence Project*. National Institute of Standards and Technology. [NIST Link](https://www.cfreds.nist.gov/)
-16. **DFRWS Forensic Challenges** (2023). *Digital Forensic Research Workshop Challenge Corpora*. DFRWS Association. [DFRWS Link](https://dfrws.org/dfrws-forensic-challenge/)
-17. **ISO/IEC 27037:2012** (2012). *Information technology — Security techniques — Guidelines for identification, collection, acquisition and preservation of digital evidence*. International Organization for Standardization. [ISO Link](https://www.iso.org/standard/44381.html)
+[1] P. Kumar, R. Kumar, G. P. Gupta, and R. Tripathi, “A distributed framework for digital evidence chain of custody using permissioned blockchain,” *IEEE Trans. Netw. Service Manag.*, vol. 18, no. 4, pp. 4771–4784, Dec. 2021, doi: 10.1109/TNSM.2021.3108871.  
+[2] S. Badr, I. Gomaa, and W. M. Abd-Elhafiez, “A secure medical forensic chain of custody based on blockchain technology,” *J. King Saud Univ.—Comput. Inf. Sci.*, vol. 34, no. 10, pp. 9184–9195, Nov. 2022, doi: 10.1016/j.jksuci.2021.10.016.  
+[3] H. Liang, N. Zhou, and X. Huang, “B-CoC: A blockchain-based digital evidence chain of custody framework with privacy protection,” *J. Inf. Secur. Appl.*, vol. 68, Art. no. 103248, Aug. 2022, doi: 10.1016/j.jisa.2022.103248.  
+[4] S. Brotsis, N. Kolokotronis, K. Limniotis, S. Bendiab, and S. Shiaeles, “On the suitability of blockchain platforms for IoT digital forensics: An empirical study,” *IEEE Internet Things J.*, vol. 9, no. 20, pp. 20387–20401, Oct. 2022, doi: 10.1109/JIOT.2022.3175895.  
+[5] M. Al-Zahrani and A. Al-Dhaqm, “A blockchain-based digital forensic chain of custody framework for cloud computing,” *IEEE Access*, vol. 10, pp. 31450–31464, Mar. 2022, doi: 10.1109/ACCESS.2022.3160408.
