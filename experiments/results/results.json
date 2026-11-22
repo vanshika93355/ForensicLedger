@@ -1,0 +1,462 @@
+{
+  "sha256": [
+    {
+      "size_kb": 1,
+      "size_bytes": 1024,
+      "iterations": 5,
+      "mean_ms": 0.12992,
+      "min_ms": 0.0046,
+      "max_ms": 0.6231,
+      "stdev_ms": 0.275712,
+      "throughput_mb_per_s": 7.517
+    },
+    {
+      "size_kb": 10,
+      "size_bytes": 10240,
+      "iterations": 5,
+      "mean_ms": 0.01472,
+      "min_ms": 0.0122,
+      "max_ms": 0.022,
+      "stdev_ms": 0.004168,
+      "throughput_mb_per_s": 663.429
+    },
+    {
+      "size_kb": 100,
+      "size_bytes": 102400,
+      "iterations": 5,
+      "mean_ms": 0.10924,
+      "min_ms": 0.1069,
+      "max_ms": 0.1163,
+      "stdev_ms": 0.003973,
+      "throughput_mb_per_s": 893.961
+    },
+    {
+      "size_kb": 1024,
+      "size_bytes": 1048576,
+      "iterations": 5,
+      "mean_ms": 1.10986,
+      "min_ms": 1.0921,
+      "max_ms": 1.1305,
+      "stdev_ms": 0.014534,
+      "throughput_mb_per_s": 901.015
+    },
+    {
+      "size_kb": 10240,
+      "size_bytes": 10485760,
+      "iterations": 5,
+      "mean_ms": 10.96136,
+      "min_ms": 10.8839,
+      "max_ms": 11.1867,
+      "stdev_ms": 0.126901,
+      "throughput_mb_per_s": 912.296
+    },
+    {
+      "size_kb": 102400,
+      "size_bytes": 104857600,
+      "iterations": 5,
+      "mean_ms": 109.6493,
+      "min_ms": 108.1664,
+      "max_ms": 112.5165,
+      "stdev_ms": 1.81879,
+      "throughput_mb_per_s": 911.999
+    }
+  ],
+  "registration": [
+    {
+      "batch_size": 1,
+      "registered": 1,
+      "total_ms": 97.5621,
+      "per_item_ms": 97.5621
+    },
+    {
+      "batch_size": 10,
+      "registered": 10,
+      "total_ms": 166.4328,
+      "per_item_ms": 16.6433
+    },
+    {
+      "batch_size": 25,
+      "registered": 25,
+      "total_ms": 524.2297,
+      "per_item_ms": 20.9692
+    },
+    {
+      "batch_size": 50,
+      "registered": 50,
+      "total_ms": 913.2351,
+      "per_item_ms": 18.2647
+    },
+    {
+      "batch_size": 100,
+      "registered": 100,
+      "total_ms": 1879.9529,
+      "per_item_ms": 18.7995
+    }
+  ],
+  "verification": {
+    "count": 50,
+    "mean_ms": 9.9611,
+    "min_ms": 8.3417,
+    "max_ms": 20.7426,
+    "stdev_ms": 2.8456,
+    "all_intact": true
+  },
+  "verification_detail": [
+    {
+      "evidence_id": "EV-4DAA70F5990A",
+      "verify_ms": 9.4425,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-ACDAC1E4D5D5",
+      "verify_ms": 9.9313,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-5C62C402B716",
+      "verify_ms": 8.6563,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-7B519494E60B",
+      "verify_ms": 8.4923,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-E102A711F0EB",
+      "verify_ms": 9.854,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-3617C104B7F3",
+      "verify_ms": 10.0185,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-9038A805D106",
+      "verify_ms": 9.7438,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-F6E4CE7BA6D9",
+      "verify_ms": 9.4118,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-DC5104AD39CC",
+      "verify_ms": 9.1501,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-358FFAB8EF83",
+      "verify_ms": 9.5571,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-22FD7F57CB29",
+      "verify_ms": 8.7724,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-D8E5155A2516",
+      "verify_ms": 8.7344,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-536280B08B86",
+      "verify_ms": 19.4017,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-32B3F1C9E93A",
+      "verify_ms": 8.9618,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-451CC54EDFCE",
+      "verify_ms": 15.1356,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-13E60E79800B",
+      "verify_ms": 10.2219,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-E3D7F2360D1A",
+      "verify_ms": 9.1744,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-49DFBCF055DD",
+      "verify_ms": 9.2214,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-23220482F94A",
+      "verify_ms": 8.4136,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-D6C076F9B2B5",
+      "verify_ms": 8.5255,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-147BDF8603B9",
+      "verify_ms": 9.0469,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-D9C1AF27587F",
+      "verify_ms": 8.9237,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-73027B9D8270",
+      "verify_ms": 9.0534,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-A187428FA119",
+      "verify_ms": 9.5046,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-52638E6A10F0",
+      "verify_ms": 8.8118,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-9A6DA3BEE9A7",
+      "verify_ms": 8.8606,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-08BB0D13E30D",
+      "verify_ms": 20.7426,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-471FF3C2344E",
+      "verify_ms": 8.8556,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-8A02B735D02C",
+      "verify_ms": 8.7309,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-75545BC88C03",
+      "verify_ms": 10.7421,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-CCB9665421CC",
+      "verify_ms": 12.1141,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-22E72B356B3F",
+      "verify_ms": 9.8381,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-828BB7D7DCB4",
+      "verify_ms": 9.716,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-F86622160F89",
+      "verify_ms": 8.7277,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-36247659BB82",
+      "verify_ms": 9.4164,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-B67E51C40991",
+      "verify_ms": 9.2011,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-3FBFFD2182CB",
+      "verify_ms": 8.9799,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-65AC12137B45",
+      "verify_ms": 8.9837,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-CD39E0362D3E",
+      "verify_ms": 8.9569,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-902D97585FAB",
+      "verify_ms": 8.8612,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-30AC80626771",
+      "verify_ms": 20.6787,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-C7398348FDAD",
+      "verify_ms": 8.4418,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-6E9018548962",
+      "verify_ms": 9.4137,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-715F5F56A343",
+      "verify_ms": 8.5286,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-94E399B20078",
+      "verify_ms": 8.5227,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-6591777CA049",
+      "verify_ms": 8.6199,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-0E0ABDCC2595",
+      "verify_ms": 8.6477,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-D209609B6FC9",
+      "verify_ms": 9.0457,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-1E502451455F",
+      "verify_ms": 8.9245,
+      "verified": true
+    },
+    {
+      "evidence_id": "EV-9B3A9D01D3EF",
+      "verify_ms": 8.3417,
+      "verified": true
+    }
+  ],
+  "merkle": [
+    {
+      "leaf_count": 1,
+      "build_ms": 0.0121,
+      "proof_gen_ms": 0.0064,
+      "proof_verify_ms": 0.0031,
+      "proof_valid": true,
+      "root_prefix": "18c0d627c7e5d56e"
+    },
+    {
+      "leaf_count": 10,
+      "build_ms": 0.0798,
+      "proof_gen_ms": 0.0204,
+      "proof_verify_ms": 0.0182,
+      "proof_valid": true,
+      "root_prefix": "7b9161adcbc1a287"
+    },
+    {
+      "leaf_count": 50,
+      "build_ms": 0.1506,
+      "proof_gen_ms": 0.0155,
+      "proof_verify_ms": 0.0374,
+      "proof_valid": true,
+      "root_prefix": "de61314bc98860ec"
+    },
+    {
+      "leaf_count": 100,
+      "build_ms": 0.2912,
+      "proof_gen_ms": 0.0149,
+      "proof_verify_ms": 0.0195,
+      "proof_valid": true,
+      "root_prefix": "8ca28c3894de80fb"
+    },
+    {
+      "leaf_count": 500,
+      "build_ms": 1.377,
+      "proof_gen_ms": 0.0271,
+      "proof_verify_ms": 0.0244,
+      "proof_valid": true,
+      "root_prefix": "0fcfbbe0993b7f9f"
+    },
+    {
+      "leaf_count": 1000,
+      "build_ms": 2.5465,
+      "proof_gen_ms": 0.0501,
+      "proof_verify_ms": 0.0418,
+      "proof_valid": true,
+      "root_prefix": "db85d42d96ff3215"
+    }
+  ],
+  "tampering": {
+    "n_items": 20,
+    "n_tampered": 10,
+    "TP": 10,
+    "FP": 0,
+    "FN": 0,
+    "TN": 10,
+    "accuracy": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1_score": 1.0
+  },
+  "baseline_comparison": [
+    {
+      "evidence_count": 10,
+      "linear_scan_ms": 0.005068,
+      "merkle_proof_ms": 0.009856,
+      "speedup_factor": 0.51
+    },
+    {
+      "evidence_count": 50,
+      "linear_scan_ms": 0.028896,
+      "merkle_proof_ms": 0.015104,
+      "speedup_factor": 1.91
+    },
+    {
+      "evidence_count": 100,
+      "linear_scan_ms": 0.124344,
+      "merkle_proof_ms": 0.016608,
+      "speedup_factor": 7.49
+    },
+    {
+      "evidence_count": 500,
+      "linear_scan_ms": 0.825268,
+      "merkle_proof_ms": 0.020564,
+      "speedup_factor": 40.13
+    },
+    {
+      "evidence_count": 1000,
+      "linear_scan_ms": 1.919184,
+      "merkle_proof_ms": 0.023664,
+      "speedup_factor": 81.1
+    },
+    {
+      "evidence_count": 2500,
+      "linear_scan_ms": 2.886688,
+      "merkle_proof_ms": 0.049904,
+      "speedup_factor": 57.84
+    },
+    {
+      "evidence_count": 5000,
+      "linear_scan_ms": 0.189544,
+      "merkle_proof_ms": 0.031776,
+      "speedup_factor": 5.96
+    }
+  ]
+}

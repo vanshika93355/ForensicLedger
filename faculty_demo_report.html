@@ -1,0 +1,59 @@
+<!doctype html><html><head><meta charset="utf-8"><title>ForensicLedger Faculty Demo</title>
+<style>body{font:15px Arial,sans-serif;margin:40px;color:#18212b}h1{color:#126b55}.summary{padding:16px;background:#eef8f3;border-radius:8px;margin:20px 0}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ddd;padding:12px;text-align:left}th{background:#126b55;color:white}.pass{color:#087443;font-weight:bold}.fail{color:#b42318;font-weight:bold}code{overflow-wrap:anywhere}small{color:#555}</style></head><body>
+<h1>ForensicLedger – Faculty Demonstration Report</h1><small>Generated automatically from live API responses. Educational prototype; not a production forensic system.</small>
+<div class="summary"><b>Demo result:</b> 10 of 10 checks passed<br><b>Evidence ID:</b> cf40d0c2da9dadebb7d263bc34edd738e22735af8bbec0fe18c24d2afc8e17aa</div>
+<table><thead><tr><th>Demonstration step</th><th>Result</th><th>Observed output</th></tr></thead><tbody><tr><td>API health</td><td class='pass'>PASS</td><td>{&quot;status&quot;: &quot;ok&quot;}</td></tr><tr><td>Evidence registration</td><td class='pass'>PASS</td><td>Evidence ID=EV-53E859A0F31A; SHA-256=279055fd41e0d61961e73d023b9b7daab9d2f0429babc133a379a8e6ddc320e5; block hash=cf40d0c2da9dadebb7d263bc34edd738e22735af8bbec0fe18c24d2afc8e17aa</td></tr><tr><td>Original evidence verification</td><td class='pass'>PASS</td><td>INTEGRITY VERIFIED</td></tr><tr><td>SQLite evidence listing</td><td class='pass'>PASS</td><td>65 evidence record(s) returned; new record present=True</td></tr><tr><td>Hash-linked ledger entry</td><td class='pass'>PASS</td><td>104 ledger block(s); registration block present</td></tr><tr><td>Custody transfer</td><td class='pass'>PASS</td><td>{&quot;block_hash&quot;: &quot;87eb398606de190d6c1822f96e2a62fbe74e37f6979566bb1d0c83a289b6a125&quot;, &quot;evidence_id&quot;: &quot;EV-53E859A0F31A&quot;, &quot;new_custodian&quot;: &quot;investigator_b&quot;, &quot;previous_custodian&quot;: &quot;investigator_a&quot;}</td></tr><tr><td>Merkle root generation</td><td class='pass'>PASS</td><td>Evidence count=65; Merkle root=29ef1a7a4b0aae186a61c3526d37da1a1b6077bb677757b9c08cf2b4e745c80c</td></tr><tr><td>Tampering detection</td><td class='pass'>PASS</td><td>INTEGRITY FAILED - HASH MISMATCH</td></tr><tr><td>Original bytes restored</td><td class='pass'>PASS</td><td>INTEGRITY VERIFIED</td></tr><tr><td>Ledger validation</td><td class='pass'>PASS</td><td>{&quot;blocks_checked&quot;: 105, &quot;invalid_block&quot;: null, &quot;valid&quot;: true}</td></tr></tbody></table>
+<h2>Raw results</h2><pre>[
+  {
+    &quot;step&quot;: &quot;API health&quot;,
+    &quot;passed&quot;: true,
+    &quot;detail&quot;: &quot;{\&quot;status\&quot;: \&quot;ok\&quot;}&quot;
+  },
+  {
+    &quot;step&quot;: &quot;Evidence registration&quot;,
+    &quot;passed&quot;: true,
+    &quot;detail&quot;: &quot;Evidence ID=EV-53E859A0F31A; SHA-256=279055fd41e0d61961e73d023b9b7daab9d2f0429babc133a379a8e6ddc320e5; block hash=cf40d0c2da9dadebb7d263bc34edd738e22735af8bbec0fe18c24d2afc8e17aa&quot;
+  },
+  {
+    &quot;step&quot;: &quot;Original evidence verification&quot;,
+    &quot;passed&quot;: true,
+    &quot;detail&quot;: &quot;INTEGRITY VERIFIED&quot;
+  },
+  {
+    &quot;step&quot;: &quot;SQLite evidence listing&quot;,
+    &quot;passed&quot;: true,
+    &quot;detail&quot;: &quot;65 evidence record(s) returned; new record present=True&quot;
+  },
+  {
+    &quot;step&quot;: &quot;Hash-linked ledger entry&quot;,
+    &quot;passed&quot;: true,
+    &quot;detail&quot;: &quot;104 ledger block(s); registration block present&quot;
+  },
+  {
+    &quot;step&quot;: &quot;Custody transfer&quot;,
+    &quot;passed&quot;: true,
+    &quot;detail&quot;: &quot;{\&quot;block_hash\&quot;: \&quot;87eb398606de190d6c1822f96e2a62fbe74e37f6979566bb1d0c83a289b6a125\&quot;, \&quot;evidence_id\&quot;: \&quot;EV-53E859A0F31A\&quot;, \&quot;new_custodian\&quot;: \&quot;investigator_b\&quot;, \&quot;previous_custodian\&quot;: \&quot;investigator_a\&quot;}&quot;
+  },
+  {
+    &quot;step&quot;: &quot;Merkle root generation&quot;,
+    &quot;passed&quot;: true,
+    &quot;detail&quot;: &quot;Evidence count=65; Merkle root=29ef1a7a4b0aae186a61c3526d37da1a1b6077bb677757b9c08cf2b4e745c80c&quot;
+  },
+  {
+    &quot;step&quot;: &quot;Tampering detection&quot;,
+    &quot;passed&quot;: true,
+    &quot;detail&quot;: &quot;INTEGRITY FAILED - HASH MISMATCH&quot;
+  },
+  {
+    &quot;step&quot;: &quot;Original bytes restored&quot;,
+    &quot;passed&quot;: true,
+    &quot;detail&quot;: &quot;INTEGRITY VERIFIED&quot;
+  },
+  {
+    &quot;step&quot;: &quot;Ledger validation&quot;,
+    &quot;passed&quot;: true,
+    &quot;detail&quot;: &quot;{\&quot;blocks_checked\&quot;: 105, \&quot;invalid_block\&quot;: null, \&quot;valid\&quot;: true}&quot;
+  }
+]</pre>
+<p><b>Interpretation:</b> File integrity verification compares the current stored file bytes with the SHA-256 digest recorded at registration. Ledger validation checks the hash-linked ledger records separately. A valid ledger does not mean an altered evidence file is intact.</p>
+</body></html>

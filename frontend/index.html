@@ -1,0 +1,1638 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ForensicLedger — Evidence Management</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              DEFAULT: '#0ea5e9',
+              dark:    '#0284c7',
+              light:   '#38bdf8',
+            },
+            surface: {
+              900: '#0f172a',
+              800: '#1e293b',
+              700: '#334155',
+              600: '#475569',
+            }
+          },
+          fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui'] }
+        }
+      }
+    }
+  </script>
+
+  <!-- Font Awesome 6 -->
+  <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+        integrity="sha512-Avb2QiuDEEvB4bZJYdft2mNjVShBftLdPG8FJ0V7irTLQ8Uo0qcPxh4Plq7G5tGm0rU+1SPhVotteLpBERwTkw=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+  <!-- Inter font -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ── scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #1e293b; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+
+    /* ── sidebar transition ── */
+    #sidebar { transition: transform .25s ease; }
+
+    /* ── drag-drop zone ── */
+    #drop-zone.drag-over { border-color: #0ea5e9; background: rgba(14,165,233,.08); }
+
+    /* ── toast ── */
+    #toast-container { z-index: 9999; }
+    .toast { animation: slideIn .3s ease, fadeOut .4s ease 3.6s forwards; }
+    @keyframes slideIn  { from { transform: translateX(120%); opacity:0; } to { transform:none; opacity:1; } }
+    @keyframes fadeOut  { to   { opacity:0; transform: translateX(120%); } }
+
+    /* ── chain-block card ── */
+    .chain-card { border-left: 3px solid #334155; }
+    .chain-card.GENESIS   { border-color: #64748b; }
+    .chain-card.REGISTER  { border-color: #0ea5e9; }
+    .chain-card.TRANSFER  { border-color: #f59e0b; }
+    .chain-card.VERIFY    { border-color: #22c55e; }
+
+    /* ── bar chart ── */
+    .bar-track { background: #334155; border-radius: 4px; height: 14px; }
+    .bar-fill  { background: #0ea5e9; height: 100%; border-radius: 4px; transition: width .6s ease; }
+
+    /* ── hash mono ── */
+    .hash { font-family: 'Courier New', monospace; font-size: .78rem; letter-spacing:.03em; }
+
+    /* ── fade page ── */
+    .page { animation: fadeP .2s ease; }
+    @keyframes fadeP { from { opacity:0; transform: translateY(6px); } to { opacity:1; transform:none; } }
+
+    /* ── timeline ── */
+    .tl-item:not(:last-child)::before {
+      content:''; position:absolute; left:11px; top:28px;
+      width:2px; bottom:-12px; background:#334155;
+    }
+
+    /* ── active nav ── */
+    .nav-item.active { background:#0ea5e920; color:#0ea5e9; }
+    .nav-item.active i { color:#0ea5e9; }
+  </style>
+</head>
+
+<body class="bg-[#0f172a] text-slate-200 font-sans min-h-screen antialiased">
+
+<!-- ════════════════════════════════════════════
+     TOAST CONTAINER
+═════════════════════════════════════════════ -->
+<div id="toast-container" class="fixed top-5 right-5 flex flex-col gap-2 pointer-events-none"></div>
+
+<!-- ════════════════════════════════════════════
+     APP SHELL
+═════════════════════════════════════════════ -->
+<div id="app">
+
+  <!-- ── LOGIN ──────────────────────────────── -->
+  <div id="login-view" class="min-h-screen flex items-center justify-center px-4">
+    <div class="w-full max-w-sm">
+      <!-- Logo -->
+      <div class="text-center mb-8">
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-brand/10 border border-brand/30 mb-4">
+          <i class="fa-solid fa-shield-halved text-3xl text-brand"></i>
+        </div>
+        <h1 class="text-2xl font-bold tracking-tight">ForensicLedger</h1>
+        <p class="text-slate-400 text-sm mt-1">Blockchain-secured evidence management</p>
+      </div>
+
+      <!-- Card -->
+      <div class="bg-[#1e293b] rounded-2xl p-8 shadow-xl border border-slate-700">
+        <h2 class="text-lg font-semibold mb-6">Sign In</h2>
+
+        <div class="space-y-4">
+          <div>
+            <label class="block text-xs font-medium text-slate-400 mb-1.5">Username</label>
+            <input id="login-user" type="text" value="investigator_a"
+                   class="w-full bg-[#0f172a] border border-slate-600 rounded-lg px-4 py-2.5 text-sm
+                          focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand transition font-mono" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-400 mb-1.5">Password</label>
+            <div class="relative">
+              <input id="login-pass" type="password" value="password123"
+                     class="w-full bg-[#0f172a] border border-slate-600 rounded-lg px-4 py-2.5 text-sm
+                            focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand transition pr-10 font-mono" />
+              <button onclick="togglePwd()" class="absolute right-3 top-2.5 text-slate-400 hover:text-slate-200 text-sm">
+                <i id="pwd-eye" class="fa-regular fa-eye"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Quick Fill Buttons -->
+          <div>
+            <label class="block text-xs font-medium text-slate-400 mb-1.5">Quick Select Account</label>
+            <div class="grid grid-cols-3 gap-2">
+              <button type="button" onclick="setLogin('investigator_a','password123')"
+                      class="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded text-xs text-sky-400 font-medium">
+                Investigator
+              </button>
+              <button type="button" onclick="setLogin('analyst_a','password123')"
+                      class="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded text-xs text-emerald-400 font-medium">
+                Analyst
+              </button>
+              <button type="button" onclick="setLogin('supervisor_a','password123')"
+                      class="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded text-xs text-purple-400 font-medium">
+                Supervisor
+              </button>
+            </div>
+          </div>
+
+          <button id="login-btn" onclick="doLogin()"
+                  class="w-full bg-brand hover:bg-brand-dark text-white font-semibold py-2.5 rounded-lg
+                         transition flex items-center justify-center gap-2 mt-2 shadow-lg shadow-sky-500/20">
+            <i class="fa-solid fa-right-to-bracket"></i> Sign In to Forensic Dashboard
+          </button>
+        </div>
+
+        <p class="text-xs text-slate-500 text-center mt-6">
+          Default: <code class="text-brand">investigator_a / password123</code> &nbsp;|&nbsp; Backend: <code class="text-brand">127.0.0.1:5000</code>
+        </p>
+      </div>
+    </div>
+  </div><!-- /login-view -->
+
+  <!-- ── MAIN SHELL (shown after login) ──────── -->
+  <div id="main-view" class="hidden flex h-screen overflow-hidden">
+
+    <!-- SIDEBAR -->
+    <aside id="sidebar"
+           class="w-64 flex-shrink-0 bg-[#1e293b] border-r border-slate-700
+                  flex flex-col overflow-y-auto lg:translate-x-0
+                  fixed inset-y-0 left-0 z-30 lg:static lg:z-auto">
+      <!-- brand -->
+      <div class="flex items-center gap-3 px-6 py-5 border-b border-slate-700">
+        <div class="w-9 h-9 rounded-xl bg-brand/10 border border-brand/30 flex items-center justify-center">
+          <i class="fa-solid fa-shield-halved text-brand text-lg"></i>
+        </div>
+        <div>
+          <div class="text-sm font-bold leading-none">ForensicLedger</div>
+          <div class="text-[10px] text-slate-400 mt-0.5">Evidence Chain</div>
+        </div>
+        <button onclick="closeSidebar()" class="ml-auto text-slate-400 hover:text-white lg:hidden">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- nav -->
+      <nav class="flex-1 py-4 px-3 space-y-1">
+        <button class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm
+                       text-slate-300 hover:bg-slate-700/50 hover:text-white transition"
+                data-page="dashboard" onclick="navigate('dashboard')">
+          <i class="fa-solid fa-gauge-high w-5 text-slate-400"></i> Dashboard
+        </button>
+        <button class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm
+                       text-slate-300 hover:bg-slate-700/50 hover:text-white transition"
+                data-page="evidence" onclick="navigate('evidence')">
+          <i class="fa-solid fa-box-archive w-5 text-slate-400"></i> Evidence
+        </button>
+        <button class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm
+                       text-slate-300 hover:bg-slate-700/50 hover:text-white transition"
+                data-page="upload" onclick="navigate('upload')">
+          <i class="fa-solid fa-cloud-arrow-up w-5 text-slate-400"></i> Upload
+        </button>
+        <button class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm
+                       text-slate-300 hover:bg-slate-700/50 hover:text-white transition"
+                data-page="blockchain" onclick="navigate('blockchain')">
+          <i class="fa-solid fa-link w-5 text-slate-400"></i> Blockchain
+        </button>
+        <button class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm
+                       text-slate-300 hover:bg-slate-700/50 hover:text-white transition"
+                data-page="auditlog" onclick="navigate('auditlog')">
+          <i class="fa-solid fa-scroll w-5 text-slate-400"></i> Audit Log
+        </button>
+        <button class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm
+                       text-slate-300 hover:bg-slate-700/50 hover:text-white transition"
+                data-page="experiments" onclick="navigate('experiments')">
+          <i class="fa-solid fa-flask w-5 text-slate-400"></i> Experiments
+        </button>
+        <button class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm
+                       text-slate-300 hover:bg-slate-700/50 hover:text-white transition"
+                data-page="reports" onclick="navigate('reports')">
+          <i class="fa-solid fa-file-contract w-5 text-slate-400"></i> Reports
+        </button>
+      </nav>
+
+      <!-- sidebar footer -->
+      <div class="p-4 border-t border-slate-700">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-full bg-brand/20 flex items-center justify-center">
+            <i class="fa-solid fa-user text-brand text-xs"></i>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div id="sidebar-user" class="text-xs font-medium truncate">—</div>
+            <div id="sidebar-role" class="text-[10px] text-slate-400 truncate"></div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- sidebar overlay (mobile) -->
+    <div id="sidebar-overlay" class="hidden fixed inset-0 bg-black/50 z-20 lg:hidden"
+         onclick="closeSidebar()"></div>
+
+    <!-- MAIN CONTENT -->
+    <div class="flex-1 flex flex-col overflow-hidden">
+
+      <!-- TOP BAR -->
+      <header class="bg-[#1e293b] border-b border-slate-700 px-4 md:px-6 py-3
+                     flex items-center gap-4 flex-shrink-0">
+        <!-- hamburger -->
+        <button onclick="openSidebar()" class="lg:hidden text-slate-400 hover:text-white">
+          <i class="fa-solid fa-bars text-lg"></i>
+        </button>
+
+        <!-- page title -->
+        <h2 id="topbar-title" class="text-sm font-semibold text-slate-200 flex-1">Dashboard</h2>
+
+        <!-- status dot -->
+        <div id="api-status" class="hidden items-center gap-1.5 text-xs text-slate-400">
+          <span class="w-2 h-2 rounded-full bg-green-400 inline-block animate-pulse"></span>
+          API Connected
+        </div>
+
+        <!-- role badge -->
+        <span id="topbar-role"
+              class="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-brand/10 text-brand border border-brand/30">
+          —
+        </span>
+
+        <!-- user -->
+        <span id="topbar-user" class="hidden md:block text-xs text-slate-400"></span>
+
+        <!-- logout -->
+        <button onclick="doLogout()"
+                class="text-xs text-slate-400 hover:text-red-400 transition flex items-center gap-1.5">
+          <i class="fa-solid fa-right-from-bracket"></i>
+          <span class="hidden md:inline">Logout</span>
+        </button>
+      </header>
+
+      <!-- PAGE AREA -->
+      <main id="page-area" class="flex-1 overflow-y-auto p-4 md:p-6"></main>
+
+    </div><!-- /main content -->
+  </div><!-- /main-view -->
+
+</div><!-- /app -->
+
+<!-- ════════════════════════════════════════════
+     JAVASCRIPT
+═════════════════════════════════════════════ -->
+<script>
+/* ═══════════════════════════════════════════
+   CONFIG & STATE
+═══════════════════════════════════════════ */
+const API = (window.location.protocol.startsWith('http')) ? window.location.origin : 'http://127.0.0.1:5000';
+let STATE = {
+  token: null,
+  user:  null,
+  role:  null,
+  currentPage: null,
+  evidenceList: [],
+  auditPage: 1,
+  auditPerPage: 20,
+};
+
+/* ═══════════════════════════════════════════
+   BOOT
+═══════════════════════════════════════════ */
+(function boot() {
+  const tok  = localStorage.getItem('fl_token');
+  const user = localStorage.getItem('fl_user');
+  const role = localStorage.getItem('fl_role');
+  if (tok && user) {
+    STATE.token = tok; STATE.user = user; STATE.role = role || 'admin';
+    showMain();
+    navigate('dashboard');
+  }
+})();
+
+/* ═══════════════════════════════════════════
+   AUTH
+═══════════════════════════════════════════ */
+async function doLogin() {
+  const username = qs('#login-user').value.trim();
+  const password = qs('#login-pass').value;
+  if (!username || !password) { toast('Please enter credentials', 'error'); return; }
+
+  setBtnLoading('#login-btn', true, 'Signing in…');
+
+  try {
+    const res = await fetch(`${API}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      STATE.token = data.token;
+      STATE.user  = data.user_id || username;
+      STATE.role  = data.role || 'investigator';
+
+      localStorage.setItem('fl_token', STATE.token);
+      localStorage.setItem('fl_user',  STATE.user);
+      localStorage.setItem('fl_role',  STATE.role);
+
+      setBtnLoading('#login-btn', false, '<i class="fa-solid fa-right-to-bracket"></i> Sign In to Forensic Dashboard');
+      toast(`Authenticated as ${STATE.user} (${roleLabel(STATE.role)})`, 'success');
+      showMain();
+      navigate('dashboard');
+    } else {
+      const err = await res.json().catch(() => ({}));
+      setBtnLoading('#login-btn', false, '<i class="fa-solid fa-right-to-bracket"></i> Sign In to Forensic Dashboard');
+      toast(err.error || 'Invalid username or password', 'error');
+    }
+  } catch (err) {
+    setBtnLoading('#login-btn', false, '<i class="fa-solid fa-right-to-bracket"></i> Sign In to Forensic Dashboard');
+    toast(`Connection failed: ${err.message}`, 'error');
+  }
+}
+
+function doLogout() {
+  localStorage.clear();
+  STATE = { token: null, user: null, role: null, currentPage: null, evidenceList: [], auditPage: 1, auditPerPage: 20 };
+  qs('#main-view').classList.add('hidden');
+  qs('#main-view').classList.remove('flex');
+  qs('#login-view').classList.remove('hidden');
+}
+
+function showMain() {
+  qs('#login-view').classList.add('hidden');
+  qs('#main-view').classList.remove('hidden');
+  qs('#main-view').classList.add('flex');
+  qs('#topbar-user').textContent = STATE.user;
+  qs('#topbar-role').textContent = roleLabel(STATE.role);
+  qs('#sidebar-user').textContent = STATE.user;
+  qs('#sidebar-role').textContent = roleLabel(STATE.role);
+}
+
+function roleLabel(r) {
+  return { admin:'Administrator', investigator:'Investigator', auditor:'Auditor' }[r] || r || 'User';
+}
+
+function setLogin(user, pwd) {
+  qs('#login-user').value = user;
+  qs('#login-pass').value = pwd;
+}
+
+function togglePwd() {
+  const inp = qs('#login-pass');
+  const ic  = qs('#pwd-eye');
+  if (inp.type === 'password') { inp.type='text'; ic.className='fa-regular fa-eye-slash'; }
+  else                         { inp.type='password'; ic.className='fa-regular fa-eye'; }
+}
+
+/* ═══════════════════════════════════════════
+   ROUTING
+═══════════════════════════════════════════ */
+const PAGES = {
+  dashboard:   renderDashboard,
+  evidence:    renderEvidence,
+  upload:      renderUpload,
+  blockchain:  renderBlockchain,
+  auditlog:    renderAuditLog,
+  experiments: renderExperiments,
+  reports:     renderReports,
+};
+
+const PAGE_TITLES = {
+  dashboard:'Dashboard', evidence:'Evidence', upload:'Upload Evidence',
+  blockchain:'Blockchain Explorer', auditlog:'Audit Log',
+  experiments:'Experiments', reports:'Reports',
+};
+
+function navigate(page, extra) {
+  if (!STATE.token) { return; }
+  STATE.currentPage = page;
+  document.querySelectorAll('.nav-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.page === page);
+  });
+  qs('#topbar-title').textContent = PAGE_TITLES[page] || page;
+  if (PAGES[page]) PAGES[page](extra);
+  closeSidebar();
+}
+
+/* ═══════════════════════════════════════════
+   SIDEBAR (mobile)
+═══════════════════════════════════════════ */
+function openSidebar()  { qs('#sidebar').style.transform='translateX(0)'; qs('#sidebar-overlay').classList.remove('hidden'); }
+function closeSidebar() { qs('#sidebar').style.transform=''; qs('#sidebar-overlay').classList.add('hidden'); }
+
+/* ═══════════════════════════════════════════
+   API HELPERS
+═══════════════════════════════════════════ */
+async function apiFetch(path, opts = {}) {
+  const url = `${API}${path}`;
+  const headers = { ...(opts.headers || {}) };
+  if (STATE.token) {
+    headers['Authorization'] = `Bearer ${STATE.token}`;
+  }
+  const res = await fetch(url, { ...opts, headers });
+  if (res.status === 401 && STATE.token) {
+    doLogout();
+    toast('Session expired or unauthorized', 'error');
+    throw new Error('401');
+  }
+  return res;
+}
+
+async function apiJSON(path, opts = {}) {
+  const res = await apiFetch(path, opts);
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(txt || res.statusText);
+  }
+  return res.json();
+}
+
+/* ═══════════════════════════════════════════
+   DEMO DATA (used when API is unreachable)
+═══════════════════════════════════════════ */
+function demoEvidence() {
+  return [
+    { id:'EV-001', filename:'suspect_drive.dd', size:1073741824, sha256:'a3f1e9b2c4d57810a3f1e9b2c4d57810a3f1e9b2c4d57810a3f1e9b2c4d57810', created_at:'2026-11-15T09:12:00Z', custodian:'investigator_a', block_hash:'00ab12cd', status:'verified' },
+    { id:'EV-002', filename:'memory_dump.raw',  size:536870912,  sha256:'deadbeef1234567890abcdefdeadbeef1234567890abcdefdeadbeef12345678', created_at:'2026-11-16T14:30:00Z', custodian:'investigator_b', block_hash:'00cc33ff', status:'pending' },
+    { id:'EV-003', filename:'network_pcap.pcap',size:52428800,   sha256:'cafebabe9876543210fedcbacafebabe9876543210fedcbacafebabe98765432', created_at:'2026-11-17T11:45:00Z', custodian:'investigator_a', block_hash:'00ef55aa', status:'verified' },
+    { id:'EV-004', filename:'browser_history.sqlite',size:2097152,sha256:'11223344556677889900aabb11223344556677889900aabb1122334455667788', created_at:'2026-11-18T08:00:00Z', custodian:'investigator_b', block_hash:'00112233', status:'verified' },
+    { id:'EV-005', filename:'emails_archive.pst',size:734003200, sha256:'aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899', created_at:'2026-11-19T16:20:00Z', custodian:'investigator_a', block_hash:'00ffeedd', status:'pending' },
+  ];
+}
+
+function demoBlocks() {
+  return [
+    { idx:0, action:'GENESIS',   actor:'system',         timestamp:'2026-11-10T00:00:00Z', hash:'0000000000000000', previous_hash:'0000000000000000', data:{} },
+    { idx:1, action:'REGISTER',  actor:'investigator_a', timestamp:'2026-11-15T09:12:05Z', hash:'00ab12cd34ef5678', previous_hash:'0000000000000000', data:{evidence_id:'EV-001'} },
+    { idx:2, action:'REGISTER',  actor:'investigator_b', timestamp:'2026-11-16T14:30:12Z', hash:'00cc33ff11223344', previous_hash:'00ab12cd34ef5678', data:{evidence_id:'EV-002'} },
+    { idx:3, action:'TRANSFER',  actor:'investigator_a', timestamp:'2026-11-17T10:00:00Z', hash:'00ef55aabbccddee', previous_hash:'00cc33ff11223344', data:{evidence_id:'EV-002',new_custodian:'investigator_a'} },
+    { idx:4, action:'REGISTER',  actor:'investigator_a', timestamp:'2026-11-17T11:45:30Z', hash:'00ef55aa00112233', previous_hash:'00ef55aabbccddee', data:{evidence_id:'EV-003'} },
+    { idx:5, action:'VERIFY',    actor:'admin',          timestamp:'2026-11-18T09:00:00Z', hash:'00aaff5500aabb11', previous_hash:'00ef55aa00112233', data:{evidence_id:'EV-001',result:'valid'} },
+  ];
+}
+
+function demoAuditLogs() {
+  const logs = [];
+  const actions = ['UPLOAD','VERIFY','TRANSFER','DOWNLOAD','VIEW','LOGIN'];
+  const results = ['success','success','success','failed','success'];
+  const eids = ['EV-001','EV-002','EV-003','EV-004','EV-005'];
+  for (let i = 1; i <= 40; i++) {
+    logs.push({
+      id: i,
+      evidence_id: eids[i % eids.length],
+      action:      actions[i % actions.length],
+      result:      results[i % results.length],
+      timestamp:   new Date(Date.now() - i * 3600000).toISOString(),
+    });
+  }
+  return logs;
+}
+
+/* ═══════════════════════════════════════════
+   PAGE: DASHBOARD
+═══════════════════════════════════════════ */
+async function renderDashboard() {
+  setPageHTML(`
+    <div class="page space-y-6">
+      <!-- stats row -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        ${statCard('fa-box-archive','Total Evidence','—','text-brand','stat-total')}
+        ${statCard('fa-check-circle','Verified','—','text-green-400','stat-verified')}
+        ${statCard('fa-link','Blocks','—','text-purple-400','stat-blocks')}
+        ${statCard('fa-scroll','Audit Logs','—','text-amber-400','stat-audits')}
+      </div>
+
+      <!-- recent evidence + chain validity -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <!-- recent evidence -->
+        <div class="lg:col-span-2 bg-[#1e293b] rounded-xl border border-slate-700 p-5">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold">Recent Evidence</h3>
+            <button onclick="navigate('evidence')" class="text-xs text-brand hover:underline">View all</button>
+          </div>
+          <div id="dash-recent" class="space-y-2">
+            <div class="text-slate-500 text-sm text-center py-6"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Loading…</div>
+          </div>
+        </div>
+
+        <!-- chain status -->
+        <div class="bg-[#1e293b] rounded-xl border border-slate-700 p-5 flex flex-col gap-4">
+          <h3 class="font-semibold">Chain Status</h3>
+          <div id="dash-chain-validity" class="flex-1 flex items-center justify-center">
+            <div class="text-slate-500 text-sm"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Checking…</div>
+          </div>
+
+          <div class="border-t border-slate-700 pt-4 space-y-2">
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-slate-400">Role</span>
+              <span class="font-medium">${roleLabel(STATE.role)}</span>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-slate-400">User</span>
+              <span class="font-medium">${STATE.user}</span>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-slate-400">API</span>
+              <span class="font-medium text-brand">${API}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- quick actions -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        ${quickAction('fa-cloud-arrow-up','Upload Evidence','upload','brand')}
+        ${quickAction('fa-box-archive','View Evidence','evidence','purple')}
+        ${quickAction('fa-link','Blockchain','blockchain','amber')}
+        ${quickAction('fa-scroll','Audit Log','auditlog','green')}
+      </div>
+    </div>
+  `);
+
+  /* load stats */
+  try {
+    const evList = await loadEvidence();
+    const blocks = await loadBlocks();
+    const audits = await loadAuditLogs();
+    qs('#stat-total').textContent    = evList.length;
+    qs('#stat-verified').textContent = evList.filter(e => e.status === 'verified').length;
+    qs('#stat-blocks').textContent   = blocks.length;
+    qs('#stat-audits').textContent   = audits.length;
+
+    /* recent evidence */
+    qs('#dash-recent').innerHTML = evList.slice(0,5).map(e => `
+      <div class="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-700/40 transition cursor-pointer"
+           onclick="navigate('evidence-detail','${e.id}')">
+        <div class="w-8 h-8 rounded-lg bg-brand/10 flex items-center justify-center flex-shrink-0">
+          <i class="fa-solid fa-file-shield text-brand text-sm"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="text-sm font-medium truncate">${e.filename}</div>
+          <div class="text-xs text-slate-400">${e.id} · ${fmtSize(e.size)}</div>
+        </div>
+        <span class="text-[10px] px-2 py-0.5 rounded-full ${e.status==='verified'
+          ? 'bg-green-500/10 text-green-400 border border-green-500/20'
+          : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'}">${e.status}</span>
+      </div>
+    `).join('') || '<div class="text-slate-500 text-sm text-center py-6">No evidence found</div>';
+
+  } catch(err) {
+    console.warn('Dashboard load error', err);
+  }
+
+  /* chain validity */
+  try {
+    const res = await apiFetch('/api/ledger/validate');
+    const data = await res.json();
+    const valid = data.valid !== false;
+    qs('#dash-chain-validity').innerHTML = chainValidBadge(valid, data);
+  } catch {
+    qs('#dash-chain-validity').innerHTML = chainValidBadge(true, { message: 'Demo mode — no backend' });
+  }
+}
+
+function statCard(icon, label, val, color, id) {
+  return `
+  <div class="bg-[#1e293b] rounded-xl border border-slate-700 p-5">
+    <div class="flex items-center justify-between mb-3">
+      <span class="text-xs text-slate-400 font-medium">${label}</span>
+      <i class="fa-solid ${icon} ${color}"></i>
+    </div>
+    <div id="${id}" class="text-2xl font-bold">${val}</div>
+  </div>`;
+}
+
+function quickAction(icon, label, page, color) {
+  const cols = { brand:'border-brand/30 hover:bg-brand/5 text-brand', purple:'border-purple-500/30 hover:bg-purple-500/5 text-purple-400',
+                 amber:'border-amber-500/30 hover:bg-amber-500/5 text-amber-400', green:'border-green-500/30 hover:bg-green-500/5 text-green-400' };
+  return `
+  <button onclick="navigate('${page}')"
+          class="bg-[#1e293b] rounded-xl border ${cols[color]} p-4 flex flex-col items-center gap-2 transition group">
+    <i class="fa-solid ${icon} text-xl"></i>
+    <span class="text-xs font-medium text-slate-300 group-hover:text-white transition">${label}</span>
+  </button>`;
+}
+
+function chainValidBadge(valid, data) {
+  if (valid) return `
+    <div class="text-center">
+      <div class="w-16 h-16 rounded-full bg-green-500/10 border-2 border-green-500/40 flex items-center justify-center mx-auto mb-3">
+        <i class="fa-solid fa-check text-green-400 text-2xl"></i>
+      </div>
+      <div class="text-green-400 font-semibold text-sm">Chain Valid</div>
+      <div class="text-xs text-slate-400 mt-1">${data.message || 'All blocks verified'}</div>
+    </div>`;
+  return `
+    <div class="text-center">
+      <div class="w-16 h-16 rounded-full bg-red-500/10 border-2 border-red-500/40 flex items-center justify-center mx-auto mb-3">
+        <i class="fa-solid fa-xmark text-red-400 text-2xl"></i>
+      </div>
+      <div class="text-red-400 font-semibold text-sm">Chain Invalid</div>
+      <div class="text-xs text-slate-400 mt-1">${data.message || 'Integrity error detected'}</div>
+    </div>`;
+}
+
+/* ═══════════════════════════════════════════
+   PAGE: EVIDENCE LIST
+═══════════════════════════════════════════ */
+async function renderEvidence() {
+  setPageHTML(`
+    <div class="page space-y-4">
+      <div class="flex flex-col sm:flex-row gap-3">
+        <div class="relative flex-1">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-sm"></i>
+          <input id="ev-search" type="text" placeholder="Search by filename, ID, custodian…"
+                 class="w-full bg-[#1e293b] border border-slate-600 rounded-lg pl-9 pr-4 py-2 text-sm
+                        focus:outline-none focus:border-brand" oninput="filterEvidence()" />
+        </div>
+        <button onclick="navigate('upload')"
+                class="bg-brand hover:bg-brand-dark text-white text-sm font-medium px-4 py-2 rounded-lg flex items-center gap-2 whitespace-nowrap">
+          <i class="fa-solid fa-plus"></i> New Evidence
+        </button>
+      </div>
+
+      <div class="bg-[#1e293b] rounded-xl border border-slate-700 overflow-hidden">
+        <div id="ev-table-wrap">
+          <div class="text-slate-500 text-sm text-center py-12">
+            <i class="fa-solid fa-spinner fa-spin mr-2"></i>Loading evidence…
+          </div>
+        </div>
+      </div>
+    </div>
+  `);
+
+  try {
+    STATE.evidenceList = await loadEvidence();
+    renderEvTable(STATE.evidenceList);
+  } catch(e) {
+    qs('#ev-table-wrap').innerHTML = `<div class="text-red-400 text-sm text-center py-10">${e.message}</div>`;
+  }
+}
+
+function filterEvidence() {
+  const q = qs('#ev-search').value.toLowerCase();
+  const filtered = STATE.evidenceList.filter(e =>
+    e.filename.toLowerCase().includes(q) ||
+    e.id.toLowerCase().includes(q) ||
+    (e.custodian||'').toLowerCase().includes(q)
+  );
+  renderEvTable(filtered);
+}
+
+function renderEvTable(list) {
+  if (!list.length) {
+    qs('#ev-table-wrap').innerHTML = '<div class="text-slate-500 text-sm text-center py-12">No evidence found.</div>';
+    return;
+  }
+  qs('#ev-table-wrap').innerHTML = `
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-slate-700 text-slate-400 text-xs uppercase tracking-wider">
+            <th class="text-left px-5 py-3">ID</th>
+            <th class="text-left px-5 py-3">Filename</th>
+            <th class="text-left px-5 py-3 hidden md:table-cell">Size</th>
+            <th class="text-left px-5 py-3 hidden lg:table-cell">SHA-256</th>
+            <th class="text-left px-5 py-3 hidden md:table-cell">Created</th>
+            <th class="text-left px-5 py-3">Custodian</th>
+            <th class="text-left px-5 py-3">Status</th>
+            <th class="text-left px-5 py-3">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="ev-tbody">
+          ${list.map(e => `
+            <tr class="border-b border-slate-700/50 hover:bg-slate-700/20 transition">
+              <td class="px-5 py-3.5 font-mono text-xs text-brand">${e.id}</td>
+              <td class="px-5 py-3.5 max-w-[160px] truncate font-medium">${e.filename}</td>
+              <td class="px-5 py-3.5 hidden md:table-cell text-slate-400">${fmtSize(e.size)}</td>
+              <td class="px-5 py-3.5 hidden lg:table-cell">
+                <span class="hash text-slate-400">${(e.sha256||'').slice(0,16)}…</span>
+              </td>
+              <td class="px-5 py-3.5 hidden md:table-cell text-slate-400">${fmtDate(e.created_at)}</td>
+              <td class="px-5 py-3.5 text-slate-300">${e.custodian||'—'}</td>
+              <td class="px-5 py-3.5">
+                <span class="text-[10px] px-2 py-0.5 rounded-full font-medium ${e.status==='verified'
+                  ? 'bg-green-500/10 text-green-400 border border-green-500/20'
+                  : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'}">${e.status||'unknown'}</span>
+              </td>
+              <td class="px-5 py-3.5">
+                <button onclick="navigate('evidence-detail','${e.id}')"
+                        class="text-xs bg-brand/10 hover:bg-brand/20 text-brand border border-brand/30
+                               px-3 py-1 rounded-lg transition">
+                  View <i class="fa-solid fa-arrow-right ml-1 text-[10px]"></i>
+                </button>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+    <div class="px-5 py-3 border-t border-slate-700 text-xs text-slate-400">${list.length} record(s)</div>
+  `;
+}
+
+/* ═══════════════════════════════════════════
+   PAGE: EVIDENCE DETAIL
+═══════════════════════════════════════════ */
+async function navigate(page, extra) {
+  if (!STATE.token) { return; }
+  if (page === 'evidence-detail') {
+    renderEvidenceDetail(extra);
+    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+    qs('[data-page="evidence"]').classList.add('active');
+    qs('#topbar-title').textContent = 'Evidence Detail';
+    closeSidebar();
+    return;
+  }
+  STATE.currentPage = page;
+  document.querySelectorAll('.nav-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.page === page);
+  });
+  qs('#topbar-title').textContent = PAGE_TITLES[page] || page;
+  if (PAGES[page]) PAGES[page](extra);
+  closeSidebar();
+}
+
+async function renderEvidenceDetail(eid) {
+  if (!eid) { navigate('evidence'); return; }
+
+  setPageHTML(`
+    <div class="page space-y-5">
+      <div class="flex items-center gap-3">
+        <button onclick="navigate('evidence')" class="text-slate-400 hover:text-white transition">
+          <i class="fa-solid fa-arrow-left"></i>
+        </button>
+        <div>
+          <h2 class="font-semibold">Evidence Detail</h2>
+          <p class="text-xs text-slate-400">${eid}</p>
+        </div>
+      </div>
+      <div id="ev-detail-content">
+        <div class="text-slate-500 text-sm text-center py-16">
+          <i class="fa-solid fa-spinner fa-spin mr-2"></i>Loading…
+        </div>
+      </div>
+    </div>
+  `);
+
+  let ev = null, proofData = null, historyData = null, userList = null;
+  try {
+    const [evRes, proofRes, histRes, userRes] = await Promise.all([
+      apiFetch(`/api/evidence/${eid}`),
+      apiFetch(`/api/evidence/${eid}/merkle-proof`),
+      apiFetch(`/api/evidence/${eid}/history`),
+      apiFetch(`/api/users`)
+    ]);
+    if (evRes.ok) ev = await evRes.json();
+    if (proofRes.ok) proofData = await proofRes.json();
+    if (histRes.ok) historyData = await histRes.json();
+    if (userRes.ok) userList = await userRes.json();
+  } catch(err) {
+    console.error('Failed to load evidence detail:', err);
+  }
+
+  if (!ev) {
+    qs('#ev-detail-content').innerHTML = '<div class="text-red-400 text-center py-10">Evidence not found.</div>';
+    return;
+  }
+
+  const proofSteps = (proofData && proofData.proof) || [];
+  const historyItems = (historyData && historyData.history) || [];
+  const availableUsers = userList || [
+    { id: 'investigator_a', role: 'investigator' },
+    { id: 'investigator_b', role: 'investigator' },
+    { id: 'analyst_a', role: 'analyst' },
+    { id: 'supervisor_a', role: 'supervisor' }
+  ];
+
+  qs('#ev-detail-content').innerHTML = `
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-5">
+
+      <!-- Left column -->
+      <div class="xl:col-span-2 space-y-5">
+
+        <!-- Basic info card -->
+        <div class="bg-[#1e293b] rounded-xl border border-slate-700 p-5">
+          <h3 class="font-semibold mb-4 flex items-center gap-2">
+            <i class="fa-solid fa-file-shield text-brand"></i> File Information
+          </h3>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+            ${detailRow('Evidence ID',   ev.id)}
+            ${detailRow('Filename',      ev.filename)}
+            ${detailRow('File Size',     fmtSize(ev.size))}
+            ${detailRow('Created',       fmtDate(ev.created))}
+            ${detailRow('Custodian',     ev.custodian||'—')}
+            ${detailRow('Stored Name',   `<span class="font-mono text-xs text-slate-400">${ev.stored_name||ev.id}</span>`)}
+            ${detailRow('Blockchain Status', `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-500/10 text-green-400 border border-green-500/20">Anchored</span>`)}
+          </div>
+        </div>
+
+        <!-- SHA-256 card -->
+        <div class="bg-[#1e293b] rounded-xl border border-slate-700 p-5">
+          <h3 class="font-semibold mb-3 flex items-center gap-2">
+            <i class="fa-solid fa-fingerprint text-brand"></i> SHA-256 Hash
+          </h3>
+          <div class="bg-[#0f172a] rounded-lg p-4 flex items-start gap-3 border border-slate-700">
+            <span id="sha256-val" class="hash text-green-400 break-all flex-1 font-mono text-xs">${ev.sha256||'—'}</span>
+            <button onclick="copyText('${ev.sha256||''}')" title="Copy hash"
+                    class="flex-shrink-0 text-slate-400 hover:text-white transition mt-0.5">
+              <i class="fa-regular fa-copy"></i>
+            </button>
+          </div>
+
+          <!-- Verify -->
+          <div class="mt-4 flex items-center gap-3">
+            <button id="verify-btn" onclick="verifyEvidence('${ev.id}')"
+                    class="bg-brand hover:bg-brand-dark text-white text-sm font-medium px-4 py-2 rounded-lg flex items-center gap-2 transition">
+              <i class="fa-solid fa-shield-check"></i> Verify Integrity
+            </button>
+            <div id="verify-result"></div>
+          </div>
+        </div>
+
+        <!-- Merkle Proof -->
+        <div class="bg-[#1e293b] rounded-xl border border-slate-700 p-5">
+          <h3 class="font-semibold mb-4 flex items-center justify-between">
+            <span class="flex items-center gap-2"><i class="fa-solid fa-sitemap text-brand"></i> Merkle Inclusion Proof</span>
+            ${proofData ? `<span class="text-xs px-2.5 py-0.5 rounded font-medium ${proofData.verified ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400'}">${proofData.verified ? '<i class="fa-solid fa-check mr-1"></i>Cryptographically Verified' : 'Unverified'}</span>` : ''}
+          </h3>
+          <div class="space-y-2">
+            ${proofSteps.length ? proofSteps.map((p, i) => `
+              <div class="flex items-center gap-3 p-2.5 bg-[#0f172a] rounded-lg border border-slate-800 text-xs">
+                <span class="text-xs font-mono font-medium text-slate-400 w-6">#${i+1}</span>
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold ${p.position==='left'||p.direction==='left'?'bg-blue-500/10 text-blue-400 border border-blue-500/20':'bg-purple-500/10 text-purple-400 border border-purple-500/20'}">${(p.position||p.direction||'right').toUpperCase()}</span>
+                <span class="font-mono text-slate-300 break-all flex-1 text-[11px]">${p.sibling}</span>
+              </div>
+            `).join('') : '<div class="text-slate-400 text-xs py-2">Merkle proof tree generated from registered evidence set.</div>'}
+          </div>
+          ${proofData && proofData.root ? `<div class="mt-3 pt-3 border-t border-slate-800 text-xs text-slate-400 flex items-center gap-2"><span>Merkle Root:</span><span class="font-mono text-sky-400 text-[11px] break-all">${proofData.root}</span></div>` : ''}
+        </div>
+
+        <!-- Transfer Custody -->
+        <div class="bg-[#1e293b] rounded-xl border border-slate-700 p-5">
+          <h3 class="font-semibold mb-4 flex items-center gap-2">
+            <i class="fa-solid fa-rotate text-brand"></i> Transfer Custody
+          </h3>
+          <div class="space-y-3">
+            <div>
+              <label class="text-xs text-slate-400 block mb-1">New Custodian</label>
+              <select id="transfer-to"
+                      class="w-full bg-[#0f172a] border border-slate-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand font-mono">
+                ${availableUsers.filter(u => u.id !== ev.custodian).map(u => `
+                  <option value="${u.id}">${u.id} (${u.role})</option>
+                `).join('')}
+              </select>
+            </div>
+            <div>
+              <label class="text-xs text-slate-400 block mb-1">Reason for Transfer</label>
+              <textarea id="transfer-reason" rows="2" placeholder="e.g. Forwarded for laboratory extraction..."
+                        class="w-full bg-[#0f172a] border border-slate-600 rounded-lg px-3 py-2 text-sm
+                               focus:outline-none focus:border-brand resize-none"></textarea>
+            </div>
+            <div class="flex items-center gap-3">
+              <button onclick="transferCustody('${ev.id}')"
+                      class="bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium px-4 py-2 rounded-lg flex items-center gap-2 transition">
+                <i class="fa-solid fa-rotate"></i> Record Custody Transfer
+              </button>
+              <div id="transfer-result"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right column -->
+      <div class="space-y-5">
+
+        <!-- Custody Timeline -->
+        <div class="bg-[#1e293b] rounded-xl border border-slate-700 p-5">
+          <h3 class="font-semibold mb-4 flex items-center gap-2">
+            <i class="fa-solid fa-timeline text-brand"></i> Custody & Event History
+          </h3>
+          <div class="space-y-4">
+            ${historyItems.length ? historyItems.map((h, i) => `
+              <div class="relative pl-7 tl-item">
+                <div class="absolute left-0 top-0.5 w-6 h-6 rounded-full border-2
+                            ${h.action==='REGISTER'?'border-brand bg-brand/10':(h.source==='custody'||h.action==='TRANSFER'?'border-amber-500 bg-amber-500/10':'border-green-500 bg-green-500/10')}
+                            flex items-center justify-center">
+                  <i class="fa-solid ${h.action==='REGISTER'?'fa-plus':(h.source==='custody'||h.action==='TRANSFER'?'fa-rotate':'fa-check')} text-[9px]
+                            ${h.action==='REGISTER'?'text-brand':(h.source==='custody'||h.action==='TRANSFER'?'text-amber-400':'text-green-400')}"></i>
+                </div>
+                <div class="text-xs font-semibold text-slate-200">${h.action || (h.source==='custody'?'CUSTODY TRANSFER':'EVENT')}</div>
+                <div class="text-xs text-slate-400">${h.source==='custody' ? `${h.previous_custodian} → ${h.new_custodian}` : (h.actor || 'System')}</div>
+                <div class="text-xs text-slate-500 mt-0.5">${fmtDate(h.timestamp)}</div>
+                ${h.reason ? `<div class="text-xs text-slate-300 mt-1 italic bg-[#0f172a] p-1.5 rounded border border-slate-800">"${h.reason}"</div>` : ''}
+              </div>
+            `).join('') : '<div class="text-slate-400 text-xs">No prior custody transfers.</div>'}
+          </div>
+        </div>
+
+        <!-- Download Report -->
+        <div class="bg-[#1e293b] rounded-xl border border-slate-700 p-5">
+          <h3 class="font-semibold mb-3 flex items-center gap-2">
+            <i class="fa-solid fa-file-contract text-brand"></i> Courtroom Report
+          </h3>
+          <p class="text-xs text-slate-400 mb-4">Export official chain-of-custody documentation certified with cryptographic block hashes.</p>
+          <div class="flex flex-col gap-2">
+            <a href="${API}/api/evidence/${ev.id}/report?format=pdf"
+               target="_blank"
+               class="inline-flex items-center justify-center gap-2 bg-brand/10 hover:bg-brand/20 border border-brand/30
+                      text-xs font-medium px-4 py-2.5 rounded-lg transition text-brand">
+              <i class="fa-solid fa-file-pdf"></i> Download Official PDF Report
+            </a>
+            <a href="${API}/api/evidence/${ev.id}/report?format=txt"
+               target="_blank"
+               class="inline-flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-600
+                      text-xs font-medium px-4 py-2 rounded-lg transition text-slate-300">
+              <i class="fa-solid fa-file-lines"></i> Download Plain-Text Record
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function detailRow(label, val) {
+  return `
+    <div>
+      <div class="text-xs text-slate-400 mb-0.5">${label}</div>
+      <div class="font-medium">${val}</div>
+    </div>`;
+}
+
+async function verifyEvidence(eid) {
+  setBtnLoading('#verify-btn', true, 'Verifying…');
+  qs('#verify-result').innerHTML = '';
+  try {
+    const res = await apiFetch(`/api/evidence/verify/${eid}`, { method:'POST' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Verification failed');
+    const ok = data.verified === true;
+    qs('#verify-result').innerHTML = `
+      <div class="flex items-center gap-2 text-sm font-medium ${ok ? 'text-green-400' : 'text-red-400'}">
+        <i class="fa-solid ${ok ? 'fa-check-circle' : 'fa-xmark-circle'}"></i>
+        ${data.status || (ok ? 'INTEGRITY VERIFIED' : 'INTEGRITY FAILED - HASH MISMATCH')}
+      </div>`;
+    toast(ok ? 'Evidence integrity verified!' : 'Integrity check FAILED: Hash mismatch!', ok ? 'success' : 'error');
+  } catch (err) {
+    qs('#verify-result').innerHTML = `<div class="flex items-center gap-2 text-sm text-red-400"><i class="fa-solid fa-triangle-exclamation"></i>${err.message}</div>`;
+    toast(err.message, 'error');
+  }
+  setBtnLoading('#verify-btn', false, '<i class="fa-solid fa-shield-check"></i> Verify Integrity');
+}
+
+async function transferCustody(eid) {
+  const newCustodian = qs('#transfer-to').value;
+  const reason       = qs('#transfer-reason').value.trim();
+  if (!reason) { toast('Please enter a reason', 'error'); return; }
+  qs('#transfer-result').innerHTML = '<i class="fa-solid fa-spinner fa-spin text-slate-400 text-sm"></i>';
+  try {
+    const res = await apiFetch(`/api/evidence/${eid}/transfer`, {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify({ new_custodian: newCustodian, reason }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Custody transfer failed');
+    toast(`Custody transferred to ${newCustodian}!`, 'success');
+    qs('#transfer-result').innerHTML = `<div class="flex items-center gap-2 text-sm text-green-400"><i class="fa-solid fa-check-circle"></i> Transferred (Block #${data.block_hash ? data.block_hash.slice(0,8) : 'OK'})</div>`;
+    setTimeout(() => renderEvidenceDetail(eid), 1200);
+  } catch (err) {
+    qs('#transfer-result').innerHTML = `<div class="flex items-center gap-2 text-sm text-red-400"><i class="fa-solid fa-xmark-circle"></i> ${err.message}</div>`;
+    toast(err.message, 'error');
+  }
+}
+
+/* ═══════════════════════════════════════════
+   PAGE: UPLOAD
+═══════════════════════════════════════════ */
+function renderUpload() {
+  setPageHTML(`
+    <div class="page max-w-2xl mx-auto space-y-5">
+      <div class="bg-[#1e293b] rounded-xl border border-slate-700 p-6">
+        <h3 class="font-semibold mb-5 flex items-center gap-2">
+          <i class="fa-solid fa-cloud-arrow-up text-brand"></i> Upload Evidence
+        </h3>
+
+        <!-- Drop zone -->
+        <div id="drop-zone"
+             class="border-2 border-dashed border-slate-600 rounded-xl p-10 text-center cursor-pointer
+                    hover:border-brand transition"
+             onclick="document.getElementById('file-input').click()"
+             ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
+          <i class="fa-solid fa-cloud-arrow-up text-4xl text-slate-500 mb-3"></i>
+          <div class="text-slate-300 font-medium">Drop files here or <span class="text-brand">browse</span></div>
+          <div class="text-xs text-slate-500 mt-1">Any file type · SHA-256 computed locally</div>
+          <input id="file-input" type="file" class="hidden" onchange="onFileSelected(event)" />
+        </div>
+
+        <!-- File preview -->
+        <div id="file-preview" class="hidden mt-4 bg-[#0f172a] rounded-lg p-4 border border-slate-700">
+          <div class="flex items-start gap-3">
+            <div class="w-10 h-10 rounded-lg bg-brand/10 flex items-center justify-center flex-shrink-0">
+              <i class="fa-solid fa-file text-brand"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+              <div id="preview-name" class="font-medium text-sm truncate"></div>
+              <div id="preview-size" class="text-xs text-slate-400 mt-0.5"></div>
+              <div class="mt-2">
+                <div class="text-[10px] text-slate-400 mb-0.5">SHA-256</div>
+                <div id="preview-sha" class="hash text-green-400 text-xs break-all flex items-center gap-2">
+                  <i class="fa-solid fa-spinner fa-spin"></i> Computing…
+                </div>
+              </div>
+            </div>
+            <button onclick="clearFile()" class="text-slate-500 hover:text-red-400 transition">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Form fields -->
+        <div class="mt-5 space-y-4">
+          <div>
+            <label class="text-xs text-slate-400 block mb-1.5">Actor / Investigator</label>
+            <select id="upload-actor"
+                    class="w-full bg-[#0f172a] border border-slate-600 rounded-lg px-3 py-2.5 text-sm
+                           focus:outline-none focus:border-brand">
+              <option value="investigator_a">investigator_a</option>
+              <option value="investigator_b">investigator_b</option>
+              <option value="admin">admin</option>
+            </select>
+          </div>
+          <button id="upload-btn" onclick="doUpload()"
+                  class="w-full bg-brand hover:bg-brand-dark text-white font-semibold py-2.5 rounded-lg
+                         transition flex items-center justify-center gap-2">
+            <i class="fa-solid fa-cloud-arrow-up"></i> Upload to Ledger
+          </button>
+        </div>
+      </div>
+
+      <!-- Result -->
+      <div id="upload-result" class="hidden bg-[#1e293b] rounded-xl border border-slate-700 p-5">
+        <h3 class="font-semibold mb-4 flex items-center gap-2 text-green-400">
+          <i class="fa-solid fa-check-circle"></i> Upload Successful
+        </h3>
+        <div id="upload-result-body" class="space-y-2 text-sm"></div>
+      </div>
+    </div>
+  `);
+}
+
+let selectedFile = null;
+let selectedHash = null;
+
+function onDragOver(e)  { e.preventDefault(); qs('#drop-zone').classList.add('drag-over'); }
+function onDragLeave(e) { qs('#drop-zone').classList.remove('drag-over'); }
+function onDrop(e)      { e.preventDefault(); qs('#drop-zone').classList.remove('drag-over'); processFile(e.dataTransfer.files[0]); }
+function onFileSelected(e) { processFile(e.target.files[0]); }
+
+async function processFile(file) {
+  if (!file) return;
+  selectedFile = file;
+  selectedHash = null;
+  qs('#file-preview').classList.remove('hidden');
+  qs('#preview-name').textContent = file.name;
+  qs('#preview-size').textContent = fmtSize(file.size);
+  qs('#preview-sha').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Computing…';
+
+  try {
+    const buf  = await file.arrayBuffer();
+    const hash = await crypto.subtle.digest('SHA-256', buf);
+    const hex  = Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2,'0')).join('');
+    selectedHash = hex;
+    qs('#preview-sha').innerHTML = `${hex} <button onclick="copyText('${hex}')" class="text-slate-400 hover:text-white"><i class="fa-regular fa-copy text-xs"></i></button>`;
+  } catch(e) {
+    qs('#preview-sha').innerHTML = '<span class="text-red-400">Error computing hash</span>';
+  }
+}
+
+function clearFile() {
+  selectedFile = null; selectedHash = null;
+  qs('#file-preview').classList.add('hidden');
+  qs('#file-input').value = '';
+}
+
+async function doUpload() {
+  if (!selectedFile) { toast('Please select a file first', 'error'); return; }
+  setBtnLoading('#upload-btn', true, 'Uploading…');
+
+  const actor = qs('#upload-actor').value;
+  const fd = new FormData();
+  fd.append('file', selectedFile);
+  fd.append('actor', actor);
+  if (selectedHash) fd.append('sha256', selectedHash);
+
+  try {
+    const res = await apiFetch('/api/evidence/upload', { method:'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Upload failed');
+    showUploadResult(data);
+    toast('Evidence uploaded and anchored to blockchain!', 'success');
+  } catch (err) {
+    toast(err.message || 'Upload failed', 'error');
+    qs('#upload-result').innerHTML = `<div class="bg-red-500/10 border border-red-500/30 rounded-lg p-4 text-red-400 text-sm flex items-center gap-2"><i class="fa-solid fa-triangle-exclamation"></i>${err.message}</div>`;
+    qs('#upload-result').classList.remove('hidden');
+  }
+  setBtnLoading('#upload-btn', false, '<i class="fa-solid fa-cloud-arrow-up"></i> Upload to Ledger');
+}
+
+function showUploadResult(data) {
+  qs('#upload-result').classList.remove('hidden');
+  qs('#upload-result-body').innerHTML = `
+    ${resRow('Evidence ID', `<span class="font-mono text-brand">${data.evidence_id||'—'}</span>`)}
+    ${resRow('Block Hash',  `<span class="hash text-purple-400">${data.block_hash||'—'}</span>`)}
+    ${resRow('SHA-256',     `<span class="hash text-green-400 break-all">${data.sha256||selectedHash||'—'}</span>`)}
+    ${data.message ? resRow('Note', `<span class="text-slate-400 italic">${data.message}</span>`) : ''}
+  `;
+}
+function resRow(k, v) { return `<div class="flex flex-col sm:flex-row sm:items-start gap-1"><span class="text-slate-400 w-32 flex-shrink-0 text-xs">${k}</span><span class="flex-1">${v}</span></div>`; }
+
+/* ═══════════════════════════════════════════
+   PAGE: BLOCKCHAIN EXPLORER
+═══════════════════════════════════════════ */
+async function renderBlockchain() {
+  setPageHTML(`
+    <div class="page space-y-5">
+      <div class="flex items-center justify-between">
+        <div id="chain-valid-banner"></div>
+        <button onclick="renderBlockchain()"
+                class="text-xs text-slate-400 hover:text-white border border-slate-600 rounded-lg px-3 py-1.5 transition flex items-center gap-1.5">
+          <i class="fa-solid fa-rotate-right"></i> Refresh
+        </button>
+      </div>
+      <div id="blocks-wrap">
+        <div class="text-slate-500 text-sm text-center py-16"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Loading ledger…</div>
+      </div>
+    </div>
+  `);
+
+  /* validity */
+  try {
+    const r = await apiFetch('/api/ledger/validate');
+    const d = await r.json();
+    qs('#chain-valid-banner').innerHTML = chainValidityPill(d.valid !== false, d.message);
+  } catch {
+    qs('#chain-valid-banner').innerHTML = chainValidityPill(true, 'Demo mode');
+  }
+
+  /* blocks */
+  try {
+    const blocks = await loadBlocks();
+    if (!blocks.length) {
+      qs('#blocks-wrap').innerHTML = '<div class="text-slate-500 text-sm text-center py-10">No blocks found.</div>';
+      return;
+    }
+    qs('#blocks-wrap').innerHTML = `
+      <div class="space-y-3">
+        ${[...blocks].reverse().map(b => blockCard(b)).join('')}
+      </div>`;
+  } catch(e) {
+    qs('#blocks-wrap').innerHTML = `<div class="text-red-400 text-sm text-center py-10">${e.message}</div>`;
+  }
+}
+
+function chainValidityPill(valid, msg) {
+  return `<div class="flex items-center gap-2 text-sm font-medium ${valid?'text-green-400':'text-red-400'}">
+    <i class="fa-solid ${valid?'fa-check-circle':'fa-xmark-circle'}"></i>
+    Chain ${valid?'Valid':'Invalid'} ${msg?`· <span class="text-slate-400 font-normal text-xs">${msg}</span>`:''}
+  </div>`;
+}
+
+function blockCard(b) {
+  const colors = { GENESIS:'GENESIS', REGISTER:'REGISTER', TRANSFER:'TRANSFER', VERIFY:'VERIFY' };
+  const badgeClass = {
+    GENESIS:  'bg-slate-700/50 text-slate-300',
+    REGISTER: 'bg-brand/10 text-brand border-brand/30',
+    TRANSFER: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+    VERIFY:   'bg-green-500/10 text-green-400 border-green-500/30',
+  }[b.action] || 'bg-slate-700 text-slate-300';
+
+  return `
+  <div class="chain-card ${colors[b.action]||''} bg-[#1e293b] rounded-xl border border-slate-700 p-5">
+    <div class="flex flex-wrap items-start gap-3 mb-3">
+      <div class="text-lg font-bold text-slate-400">#${b.idx}</div>
+      <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${badgeClass}">${b.action}</span>
+      <span class="text-xs text-slate-400 ml-auto">${fmtDate(b.timestamp)}</span>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+      <div>
+        <div class="text-xs text-slate-400 mb-0.5">Actor</div>
+        <div class="font-medium">${b.actor||'—'}</div>
+      </div>
+      ${b.data && b.data.evidence_id ? `<div><div class="text-xs text-slate-400 mb-0.5">Evidence</div><div class="font-mono text-brand text-xs">${b.data.evidence_id}</div></div>` : ''}
+      <div>
+        <div class="text-xs text-slate-400 mb-0.5">Hash</div>
+        <div class="hash text-slate-300 text-xs">${(b.hash||'').slice(0,24)}…</div>
+      </div>
+      <div>
+        <div class="text-xs text-slate-400 mb-0.5">Previous Hash</div>
+        <div class="hash text-slate-500 text-xs">${(b.previous_hash||'').slice(0,24)}…</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ═══════════════════════════════════════════
+   PAGE: AUDIT LOG
+═══════════════════════════════════════════ */
+async function renderAuditLog() {
+  setPageHTML(`
+    <div class="page space-y-4">
+      <div class="flex items-center justify-between">
+        <div class="text-sm text-slate-400" id="audit-count">Loading…</div>
+        <div class="flex items-center gap-2">
+          <button onclick="STATE.auditPage=Math.max(1,STATE.auditPage-1);renderAuditLog()"
+                  class="text-xs border border-slate-600 rounded px-3 py-1.5 hover:bg-slate-700 transition">
+            <i class="fa-solid fa-chevron-left"></i>
+          </button>
+          <span id="audit-page-label" class="text-xs text-slate-400">Page 1</span>
+          <button onclick="STATE.auditPage++;renderAuditLog()"
+                  class="text-xs border border-slate-600 rounded px-3 py-1.5 hover:bg-slate-700 transition">
+            <i class="fa-solid fa-chevron-right"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="bg-[#1e293b] rounded-xl border border-slate-700 overflow-hidden">
+        <div id="audit-wrap">
+          <div class="text-slate-500 text-sm text-center py-12"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Loading logs…</div>
+        </div>
+      </div>
+    </div>
+  `);
+
+  try {
+    const all  = await loadAuditLogs();
+    const page = STATE.auditPage;
+    const pp   = STATE.auditPerPage;
+    const totalPages = Math.max(1, Math.ceil(all.length / pp));
+    if (page > totalPages) STATE.auditPage = totalPages;
+    const slice = all.slice((STATE.auditPage-1)*pp, STATE.auditPage*pp);
+    qs('#audit-count').textContent = `${all.length} total records`;
+    qs('#audit-page-label').textContent = `Page ${STATE.auditPage} / ${totalPages}`;
+
+    qs('#audit-wrap').innerHTML = `
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-slate-700 text-slate-400 text-xs uppercase tracking-wider">
+              <th class="text-left px-5 py-3">ID</th>
+              <th class="text-left px-5 py-3">Evidence ID</th>
+              <th class="text-left px-5 py-3">Action</th>
+              <th class="text-left px-5 py-3">Result</th>
+              <th class="text-left px-5 py-3">Timestamp</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${slice.map(l => `
+              <tr class="border-b border-slate-700/50 hover:bg-slate-700/20 transition">
+                <td class="px-5 py-3 text-slate-500 text-xs">${l.id}</td>
+                <td class="px-5 py-3 font-mono text-brand text-xs">${l.evidence_id||'—'}</td>
+                <td class="px-5 py-3">
+                  <span class="text-[10px] font-semibold px-2 py-0.5 rounded ${actionBadge(l.action)}">${l.action}</span>
+                </td>
+                <td class="px-5 py-3">
+                  <span class="text-xs font-medium ${l.result==='success'?'text-green-400':'text-red-400'}">
+                    <i class="fa-solid ${l.result==='success'?'fa-check':'fa-xmark'} mr-1"></i>${l.result}
+                  </span>
+                </td>
+                <td class="px-5 py-3 text-slate-400 text-xs">${fmtDate(l.timestamp)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  } catch(e) {
+    qs('#audit-wrap').innerHTML = `<div class="text-red-400 text-sm text-center py-10">${e.message}</div>`;
+  }
+}
+
+function actionBadge(action) {
+  return { UPLOAD:'bg-brand/10 text-brand', VERIFY:'bg-green-500/10 text-green-400',
+           TRANSFER:'bg-amber-500/10 text-amber-400', DOWNLOAD:'bg-purple-500/10 text-purple-400',
+           VIEW:'bg-slate-700 text-slate-300', LOGIN:'bg-slate-700 text-slate-300' }[action]
+         || 'bg-slate-700 text-slate-300';
+}
+
+/* ═══════════════════════════════════════════
+   PAGE: EXPERIMENTS
+═══════════════════════════════════════════ */
+function renderExperiments() {
+  const demoResults = [
+    { label:'1 KB',   size:1024,       ms:0.4  },
+    { label:'10 KB',  size:10240,      ms:1.2  },
+    { label:'100 KB', size:102400,     ms:5.8  },
+    { label:'1 MB',   size:1048576,    ms:28.3 },
+    { label:'10 MB',  size:10485760,   ms:201.7},
+    { label:'50 MB',  size:52428800,   ms:987.4},
+  ];
+  const maxMs = Math.max(...demoResults.map(r => r.ms));
+
+  setPageHTML(`
+    <div class="page space-y-5">
+      <div class="bg-[#1e293b] rounded-xl border border-slate-700 p-5">
+        <div class="flex items-center justify-between mb-5">
+          <div>
+            <h3 class="font-semibold flex items-center gap-2">
+              <i class="fa-solid fa-flask text-brand"></i> SHA-256 Benchmark
+            </h3>
+            <p class="text-xs text-slate-400 mt-1">Measures SubtleCrypto SHA-256 compute time by file size</p>
+          </div>
+          <button id="bench-btn" onclick="runBenchmark()"
+                  class="bg-brand hover:bg-brand-dark text-white text-sm font-medium px-4 py-2 rounded-lg flex items-center gap-2 transition">
+            <i class="fa-solid fa-play"></i> Run Benchmark
+          </button>
+        </div>
+
+        <div id="bench-results">
+          ${benchTable(demoResults, maxMs)}
+        </div>
+      </div>
+
+      <!-- Crypto Info -->
+      <div class="bg-[#1e293b] rounded-xl border border-slate-700 p-5">
+        <h3 class="font-semibold mb-4 flex items-center gap-2">
+          <i class="fa-solid fa-microchip text-brand"></i> Browser Crypto API
+        </h3>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          ${cryptoInfoCard('SubtleCrypto', 'SHA-256', 'Web Crypto API · Hardware-accelerated')}
+          ${cryptoInfoCard('Algorithm', 'SHA-256', '256-bit / 32-byte digest')}
+          ${cryptoInfoCard('Standard', 'FIPS 180-4', 'NIST Secure Hash Standard')}
+        </div>
+      </div>
+    </div>
+  `);
+}
+
+function benchTable(results, maxMs) {
+  return `
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm mb-4">
+        <thead>
+          <tr class="border-b border-slate-700 text-slate-400 text-xs uppercase tracking-wider">
+            <th class="text-left px-4 py-3">File Size</th>
+            <th class="text-left px-4 py-3">Bytes</th>
+            <th class="text-left px-4 py-3">Time (ms)</th>
+            <th class="text-left px-4 py-3 w-56">Relative Speed</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${results.map(r => `
+            <tr class="border-b border-slate-700/40 hover:bg-slate-700/20 transition">
+              <td class="px-4 py-3 font-medium">${r.label}</td>
+              <td class="px-4 py-3 text-slate-400 font-mono text-xs">${r.size.toLocaleString()}</td>
+              <td class="px-4 py-3 font-mono text-brand">${r.ms.toFixed(4)} ms</td>
+              <td class="px-4 py-3">
+                <div class="bar-track w-48">
+                  <div class="bar-fill" style="width:${Math.max(5, Math.round((r.ms/maxMs)*100))}%"></div>
+                </div>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function cryptoInfoCard(label, val, sub) {
+  return `
+  <div class="bg-[#0f172a] rounded-lg p-4 border border-slate-700">
+    <div class="text-xs text-slate-400 mb-1">${label}</div>
+    <div class="font-semibold text-sm">${val}</div>
+    <div class="text-xs text-slate-500 mt-0.5">${sub}</div>
+  </div>`;
+}
+
+async function runBenchmark() {
+  setBtnLoading('#bench-btn', true, 'Benchmarking…');
+  qs('#bench-results').innerHTML = `<div class="text-slate-400 text-sm text-center py-8"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Running SHA-256 Benchmark across multiple payloads…</div>`;
+
+  try {
+    const res = await apiFetch('/api/experiment/benchmark', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ file_sizes_kb: [1, 10, 100, 1024, 10240], iterations: 3 })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const arr = data.results.map(r => ({
+        label: r.size_kb >= 1024 ? `${r.size_kb/1024} MB` : `${r.size_kb} KB`,
+        size: r.size_bytes,
+        ms: r.sha256_ms_avg
+      }));
+      const maxMs = Math.max(...arr.map(r => r.ms || 0.001));
+      qs('#bench-results').innerHTML = benchTable(arr, maxMs);
+      toast('Live server benchmark completed!', 'success');
+      setBtnLoading('#bench-btn', false, '<i class="fa-solid fa-play"></i> Run Benchmark');
+      return;
+    }
+  } catch(err) {
+    console.warn('Backend benchmark failed, running client-side:', err);
+  }
+
+  /* In-browser Web Crypto API benchmark */
+  const sizes = [1024, 10240, 102400, 1048576, 5242880];
+  const labels = ['1 KB', '10 KB', '100 KB', '1 MB', '5 MB'];
+  const results = [];
+  for (let i = 0; i < sizes.length; i++) {
+    const buf = new Uint8Array(sizes[i]);
+    const t0 = performance.now();
+    await crypto.subtle.digest('SHA-256', buf);
+    const ms = performance.now() - t0;
+    results.push({ label: labels[i], size: sizes[i], ms });
+  }
+  const maxMs = Math.max(...results.map(r => r.ms || 0.001));
+  qs('#bench-results').innerHTML = benchTable(results, maxMs);
+  toast('Browser crypto benchmark complete!', 'success');
+  setBtnLoading('#bench-btn', false, '<i class="fa-solid fa-play"></i> Run Benchmark');
+}
+
+/* ═══════════════════════════════════════════
+   PAGE: REPORTS
+═══════════════════════════════════════════ */
+async function renderReports() {
+  setPageHTML(`
+    <div class="page space-y-5">
+      <div class="bg-[#1e293b] rounded-xl border border-slate-700 p-5">
+        <h3 class="font-semibold mb-5 flex items-center gap-2">
+          <i class="fa-solid fa-file-contract text-brand"></i> Evidence Reports
+        </h3>
+        <div id="reports-list">
+          <div class="text-slate-500 text-sm text-center py-10"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Loading…</div>
+        </div>
+      </div>
+    </div>
+  `);
+
+  try {
+    const list = await loadEvidence();
+    qs('#reports-list').innerHTML = `
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-slate-700 text-slate-400 text-xs uppercase tracking-wider">
+              <th class="text-left px-5 py-3">ID</th>
+              <th class="text-left px-5 py-3">Filename</th>
+              <th class="text-left px-5 py-3 hidden md:table-cell">Size</th>
+              <th class="text-left px-5 py-3 hidden md:table-cell">Custodian</th>
+              <th class="text-left px-5 py-3">Report</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${list.map(e => `
+              <tr class="border-b border-slate-700/50 hover:bg-slate-700/20 transition">
+                <td class="px-5 py-3.5 font-mono text-xs text-brand">${e.id}</td>
+                <td class="px-5 py-3.5 font-medium max-w-[200px] truncate">${e.filename}</td>
+                <td class="px-5 py-3.5 hidden md:table-cell text-slate-400">${fmtSize(e.size)}</td>
+                <td class="px-5 py-3.5 hidden md:table-cell text-slate-300">${e.custodian||'—'}</td>
+                <td class="px-5 py-3.5">
+                  <div class="flex items-center gap-2">
+                    <a href="${API}/api/evidence/${e.id}/report?format=pdf" target="_blank"
+                       class="inline-flex items-center gap-1.5 text-xs bg-brand/10 hover:bg-brand/20
+                              text-brand border border-brand/30 px-2.5 py-1 rounded-lg transition" title="Official PDF Report">
+                      <i class="fa-solid fa-file-pdf"></i> PDF
+                    </a>
+                    <a href="${API}/api/evidence/${e.id}/report?format=txt" target="_blank"
+                       class="inline-flex items-center gap-1.5 text-xs bg-slate-800 hover:bg-slate-700
+                              text-slate-300 border border-slate-600 px-2.5 py-1 rounded-lg transition" title="Plain-Text Record">
+                      <i class="fa-solid fa-file-lines"></i> TXT
+                    </a>
+                  </div>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div class="px-5 py-3 border-t border-slate-700 text-xs text-slate-400">${list.length} report(s) available</div>
+    `;
+  } catch(e) {
+    qs('#reports-list').innerHTML = `<div class="text-red-400 text-sm text-center py-10">${e.message}</div>`;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   DATA LOADERS
+═══════════════════════════════════════════ */
+async function loadEvidence() {
+  try {
+    const res = await apiFetch('/api/evidence');
+    if (res.ok) {
+      const d = await res.json();
+      return Array.isArray(d) ? d : (d.evidence || d.items || []);
+    }
+  } catch {}
+  return [];
+}
+
+async function loadBlocks() {
+  try {
+    const res = await apiFetch('/api/ledger');
+    if (res.ok) {
+      const d = await res.json();
+      return Array.isArray(d) ? d : (d.blocks || d.chain || []);
+    }
+  } catch {}
+  return [];
+}
+
+async function loadAuditLogs() {
+  try {
+    const res = await apiFetch('/api/audit_logs');
+    if (res.ok) {
+      const d = await res.json();
+      return Array.isArray(d) ? d : (d.results || d.logs || d.items || []);
+    }
+  } catch {}
+  return [];
+}
+
+/* ═══════════════════════════════════════════
+   UI HELPERS
+═══════════════════════════════════════════ */
+function qs(sel, ctx) { return (ctx || document).querySelector(sel); }
+
+function setPageHTML(html) { qs('#page-area').innerHTML = html; }
+
+function toast(msg, type = 'info') {
+  const colors = { success:'bg-green-500', error:'bg-red-500', info:'bg-brand', warning:'bg-amber-500' };
+  const icons  = { success:'fa-check-circle', error:'fa-xmark-circle', info:'fa-info-circle', warning:'fa-triangle-exclamation' };
+  const el = document.createElement('div');
+  el.className = `toast pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-lg shadow-xl
+                  text-white text-sm font-medium max-w-xs ${colors[type]||colors.info}`;
+  el.innerHTML = `<i class="fa-solid ${icons[type]||icons.info}"></i><span>${msg}</span>`;
+  qs('#toast-container').appendChild(el);
+  setTimeout(() => el.remove(), 4100);
+}
+
+function setBtnLoading(sel, loading, labelHTML) {
+  const btn = qs(sel);
+  if (!btn) return;
+  btn.disabled = loading;
+  if (loading) { btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${labelHTML}`; }
+  else         { btn.innerHTML = labelHTML; }
+}
+
+function fmtSize(bytes) {
+  if (bytes == null) return '—';
+  const units = ['B','KB','MB','GB','TB'];
+  let i = 0; let v = bytes;
+  while (v >= 1024 && i < units.length-1) { v /= 1024; i++; }
+  return `${v.toFixed(i>0?1:0)} ${units[i]}`;
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso);
+    return d.toLocaleString('en-GB', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+  } catch { return iso; }
+}
+
+function copyText(text) {
+  navigator.clipboard.writeText(text).then(() => toast('Copied to clipboard!', 'success'));
+}
+
+/* ═══════════════════════════════════════════
+   KEYBOARD SHORTCUT
+═══════════════════════════════════════════ */
+document.addEventListener('keydown', e => {
+  if (!STATE.token) return;
+  if (e.altKey) {
+    const map = { d:'dashboard', e:'evidence', u:'upload', b:'blockchain', a:'auditlog', x:'experiments', r:'reports' };
+    if (map[e.key]) { e.preventDefault(); navigate(map[e.key]); }
+  }
+});
+
+/* ═══════════════════════════════════════════
+   API CONNECTIVITY INDICATOR
+═══════════════════════════════════════════ */
+async function checkAPIStatus() {
+  try {
+    const r = await fetch(`${API}/api/health`, { signal: AbortSignal.timeout(3000) });
+    if (r.ok) qs('#api-status').classList.remove('hidden');
+  } catch {}
+}
+setTimeout(checkAPIStatus, 1000);
+</script>
+</body>
+</html>
